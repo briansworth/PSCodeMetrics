@@ -361,6 +361,7 @@ class TotalCommandStatistics
 {
   [int]$CommandCount
   [int]$UniqueCommandCount
+  [Collections.Generic.List[string]]$CommandNames
 
   [string] ToString()
   {
@@ -574,6 +575,7 @@ Function Get-ScriptBlockCommandStatistics
 
   $stats.CommandCount = $commandCount.Count
   $stats.UniqueCommandCount = $uniqueCount.Count
+  $stats.CommandNames = $commandNames
 
   return $stats
 }
