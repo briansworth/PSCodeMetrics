@@ -10,7 +10,7 @@ Function Find-CommandStatement
     [switch]$IncludeNestedClause
   )
   $commands = $ScriptBlock.Ast.FindAll(
-    {$args[0] -is [Management.Automation.Language.CommandAst]}, 
+    {$args[0] -is [Management.Automation.Language.CommandAst]},
     $IncludeNestedClause.ToBool()
   )
   return $commands
@@ -26,10 +26,10 @@ Function Find-IfStatement
     [switch]$IncludeNestedClause
   )
   $ifClause = $ScriptBlock.Ast.FindAll(
-    {$args[0] -is [Management.Automation.Language.IfStatementAst]}, 
+    {$args[0] -is [Management.Automation.Language.IfStatementAst]},
     $IncludeNestedClause.ToBool()
   )
-    
+
   return $ifClause
 }
 
@@ -43,7 +43,7 @@ Function Find-TryStatement
     [switch]$IncludeNestedClause
   )
   $catch = $ScriptBlock.Ast.FindAll(
-    {$args[0] -is [Management.Automation.Language.TryStatementAst]}, 
+    {$args[0] -is [Management.Automation.Language.TryStatementAst]},
     $IncludeNestedClause.ToBool()
   )
   return $catch
@@ -59,7 +59,7 @@ Function Find-WhileStatement
     [switch]$IncludeNestedClause
   )
   $while = $ScriptBlock.Ast.FindAll(
-    {$args[0] -is [Management.Automation.Language.WhileStatementAst]}, 
+    {$args[0] -is [Management.Automation.Language.WhileStatementAst]},
     $IncludeNestedClause.ToBool()
   )
   return $while
@@ -75,11 +75,12 @@ Function Find-SwitchStatement
     [switch]$IncludeNestedClause
   )
   $switchStatement = $ScriptBlock.Ast.FindAll(
-    {$args[0] -is [Management.Automation.Language.SwitchStatementAst]}, 
+    {$args[0] -is [Management.Automation.Language.SwitchStatementAst]},
     $IncludeNestedClause.ToBool()
   )
   return $switchStatement
 }
+
 
 class ClauseStatistics
 {
@@ -98,12 +99,14 @@ class ClauseStatistics
   }
 }
 
+
 class IfClauseStatistics: ClauseStatistics
 {
   [int]$IfStatements
   [int]$ElseIfStatements
   [int]$ElseStatements
 }
+
 
 class TryClauseStatistics: ClauseStatistics
 {
@@ -113,6 +116,7 @@ class TryClauseStatistics: ClauseStatistics
   [bool]$HasFinally
 }
 
+
 class SwitchClauseStatistics: ClauseStatistics
 {
   [int]$SwitchStatements
@@ -120,10 +124,12 @@ class SwitchClauseStatistics: ClauseStatistics
   [bool]$HasDefault
 }
 
+
 class WhileClauseStatistics: ClauseStatistics
 {
   [int]$WhileStatements
 }
+
 
 Function New-ClauseStatisticsClassInstance
 {
@@ -142,7 +148,6 @@ Function New-ClauseStatisticsClassInstance
   $classInstance = New-Object -TypeName $TypeName
   return $classInstance
 }
-
 
 Function Get-IfClauseStatistics
 {
@@ -265,6 +270,7 @@ Function Get-ScriptBlockToken
   return $tokens
 }
 
+
 class BoolOperatorStatistics
 {
   [int]$CodePaths
@@ -277,6 +283,7 @@ class BoolOperatorStatistics
     return "{CodePaths = $($this.CodePaths)...}"
   }
 }
+
 
 Function Get-BoolOperatorStatistics
 {
@@ -357,6 +364,7 @@ Function Get-MaxNestedDepth
   }
 }
 
+
 class TotalCommandStatistics
 {
   [int]$CommandCount
@@ -381,12 +389,14 @@ class TotalClauseStatistics
   }
 }
 
+
 class TotalIfClauseStatistics: TotalClauseStatistics
 {
   [int]$IfStatementTotal
   [int]$ElseIfStatementTotal
   [int]$ElseStatementTotal
 }
+
 
 class TotalTryClauseStatistics: TotalClauseStatistics
 {
@@ -397,6 +407,7 @@ class TotalTryClauseStatistics: TotalClauseStatistics
   [int]$FinallyStatementTotal
 }
 
+
 class TotalSwitchClauseStatistics: TotalClauseStatistics
 {
   [int]$SwitchStatementTotal
@@ -404,10 +415,12 @@ class TotalSwitchClauseStatistics: TotalClauseStatistics
   [int]$DefaultClauseTotal
 }
 
+
 class TotalWhileClauseStatistics: TotalClauseStatistics
 {
   [int]$WhileStatementTotal
 }
+
 
 Function Measure-IfStatementStatistics
 {
@@ -439,7 +452,6 @@ Function Measure-IfStatementStatistics
   $totalStats.LargestStatementLineCount = $longestStatement
   return $totalStats
 }
-
 
 Function Measure-TryCatchClauseStatistics
 {
@@ -569,7 +581,15 @@ Function Get-ScriptBlockCommandStatistics
   $commandNames = New-Object -TypeName 'Collections.Generic.List[string]'
   foreach ($command in $commands)
   {
-    [void]$commandNames.Add($command.CommandElements[0].Value)
+    $cmdElement = $command.CommandElements[0]
+    if ($cmdElement -is [Management.Automation.Language.StringConstantExpressionAst])
+    {
+      [void]$commandNames.Add($cmdElement[0].Value)
+    }
+    elseif ($cmdElement -is [Management.Automation.Language.VariableExpressionAst])
+    {
+      [void]$commandNames.Add($cmdElement[0].VariablePath.UserPath)
+    }
   }
   $uniqueCount = $commandNames | Select-Object -Unique | Measure-Object
 
@@ -667,7 +687,6 @@ Function Get-ScriptBlockSwitchStatistics
   return $totalStatistics
 }
 
-
 Function Get-ScriptBlockWhileStatistics
 {
   [CmdletBinding()]
@@ -697,7 +716,7 @@ Function Get-ScriptBlockWhileStatistics
   return $totalStatistics
 }
 
-Function ConvertTo-ScriptBlock 
+Function ConvertTo-ScriptBlock
 {
   [CmdletBinding()]
   Param(
@@ -734,6 +753,7 @@ Function ConvertTo-ScriptBlock
   }
 }
 
+
 class FunctionStatistics
 {
   [string]$Name
@@ -748,6 +768,7 @@ class FunctionStatistics
   [BoolOperatorStatistics]$BoolOperatorStatistics
   [TotalCommandStatistics]$CommandStatistics
 }
+
 
 Function Get-FunctionStatistics
 {
