@@ -1,5 +1,5 @@
 Remove-Module -Name PSCodeStats -ErrorAction SilentlyContinue
-Import-Module -Name ./PSCodeStats
+Import-Module -Name ./PSCodeStats.psd1
 
 
 InModuleScope -ModuleName PSCodeStats {
@@ -489,6 +489,14 @@ InModuleScope -ModuleName PSCodeStats {
       $result = Get-BoolOperatorStatistics -ScriptBlock $emptySb
 
       $result.CodePaths | Should -BeExactly 3
+    }
+
+    Context 'BoolOperatorStatistics ToString' {
+      It 'Should return a string with ToString' {
+        $result = Get-BoolOperatorStatistics -ScriptBlock $emptySb
+
+        $result.ToString() | Should -BeOfType [string]
+      }
     }
   }
 }
