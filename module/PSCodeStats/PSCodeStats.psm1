@@ -837,7 +837,7 @@ Function Get-FunctionStatistics
       $tryStats.CodePathTotal + `
       $switchStats.CodePathTotal + `
       $whileStats.CodePathTotal + `
-      $operatorStats.CodePaths
+      $operatorStats.CodePaths + 1 # Always at least 1 code path
 
     $nestedDepth = Get-MaxNestedDepth -ScriptBlock $ScriptBlock `
       -ErrorAction Stop

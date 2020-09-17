@@ -477,7 +477,7 @@ InModuleScope -ModuleName PSCodeStats {
       $mockToken2 = New-MockObject -Type 'Management.Automation.Language.Token'
       $mockTokens = @($mockToken, $mockToken1, $mockToken2)
       $kinds = @('And', 'Or', 'XOr')
-      for ($i=0; $i -lt 2; $i++)
+      for ($i=0; $i -lt 3; $i++)
       {
         $mockTokens[$i] | Add-Member -Name Kind `
           -MemberType NoteProperty `
@@ -497,6 +497,76 @@ InModuleScope -ModuleName PSCodeStats {
 
         $result.ToString() | Should -BeOfType [string]
       }
+    }
+  }
+
+  Describe 'Get-MaxNestedDepth' {
+    BeforeAll {
+      $lCurlyKind = [Management.Automation.Language.TokenKind]::LCurly
+      $rCurlyKind = [Management.Automation.Language.TokenKind]::RCurly
+
+      $lCurly = New-MockObject -Type Management.Automation.Language.Token
+      $rCurly = New-MockObject -Type Management.Automation.Language.Token
+
+      $lCurly | Add-Member -Name Kind `
+        -MemberType NoteProperty `
+        -Value $lCurlyKind `
+        -Force
+      $rCurly | Add-Member -Name Kind `
+        -MemberType NoteProperty `
+        -Value $lCurlyKind `
+        -Force
+    }
+    BeforeEach {
+      Mock -CommandName Get-ScriptBlockToken -MockWith {
+        return @($lCurly, $rCurly, $lCurly, $rCurly)
+      }
+    }
+
+    It 'Returns positive integer' {
+      $result = Get-MaxNestedDepth -ScriptBlock $emptySb
+
+      $result | Should -BeOfType [int]
+      $result | Should -BeGreaterThan 0
+    }
+
+    It 'Throws if Get-ScriptBlockToken throws' {
+      $emsg = 'Bad'
+      Mock -CommandName Get-ScriptBlockToken -MockWith {
+        Write-Error -Message $emsg -ErrorAction Stop
+      }
+
+      {Get-MaxNestedDepth -ScriptBlock $emptySb -ErrorAction Stop} | Should -Throw $emsg
+    }
+  }
+
+  Describe 'Measure-IfStatementStatistics' {
+    BeforeAll {
+      $measureType = 'Microsoft.PowerShell.Commands.GenericMeasureInfo'
+    }
+    BeforeEach {
+      $measure = New-MockObject -Type $measureType
+      $ifStats = New-MockObject -Type ([IfClauseStatistics])
+
+      $measure | Add-Member -Name Sum `
+        -MemberType NoteProperty `
+        -Value 1 `
+        -Force
+      $ifStats | Add-Member -Name GetLineCount `
+        -MemberType ScriptMethod `
+        -Value {return 1} `
+        -Force
+
+      Mock -CommandName Measure-Object {
+        return $measure
+      }
+    }
+
+    It 'Successfully measures IfClauseStatistics' {
+      $result = Measure-IfStatementStatistics -IfClauseStatistics $ifStats
+
+      $result | Should -Not -BeNullOrEmpty
+      $result.LargestStatementLineCount | Should -BeExactly 1
     }
   }
 }
