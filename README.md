@@ -1,3 +1,6 @@
+[![codecov](https://codecov.io/gh/briansworth/PSCodeStats/branch/master/graph/badge.svg)](https://codecov.io/gh/briansworth/PSCodeStats)
+
+
 ## PS Code Statistics
 
 PowerShell module for getting statistics about PowerShell functions
