@@ -738,12 +738,12 @@ InModuleScope -ModuleName PSCodeStats {
       $clause = New-MockObject -Type $clauseType
       $clauseList.Add($clause)
 
-      $stats = New-MockObject -Type ([IfClauseStatistics])
+      $stat = New-MockObject -Type ([IfClauseStatistics])
       $total = New-MockObject -Type ([TotalIfClauseStatistics])
     }
     BeforeEach {
       Mock -CommandName Find-IfStatement -MockWith {return $clauseList}
-      Mock -CommandName Get-IfClauseStatistics -MockWith {return $stats}
+      Mock -CommandName Get-IfClauseStatistics -MockWith {return $stat}
       Mock -CommandName Measure-IfStatementStatistics -MockWith {return $total}
     }
 
@@ -768,12 +768,12 @@ InModuleScope -ModuleName PSCodeStats {
       $clause = New-MockObject -Type $clauseType
       $clauseList.Add($clause)
 
-      $stats = New-MockObject -Type ([TryClauseStatistics])
+      $stat = New-MockObject -Type ([TryClauseStatistics])
       $total = New-MockObject -Type ([TotalTryClauseStatistics])
     }
     BeforeEach {
       Mock -CommandName Find-TryStatement -MockWith {return $clauseList}
-      Mock -CommandName Get-TryCatchClauseStatistics -MockWith {return $stats}
+      Mock -CommandName Get-TryCatchClauseStatistics -MockWith {return $stat}
       Mock -CommandName Measure-TryCatchClauseStatistics `
         -MockWith {return $total}
     }
@@ -799,12 +799,12 @@ InModuleScope -ModuleName PSCodeStats {
       $clause = New-MockObject -Type $clauseType
       $clauseList.Add($clause)
 
-      $stats = New-MockObject -Type ([SwitchClauseStatistics])
+      $stat = New-MockObject -Type ([SwitchClauseStatistics])
       $total = New-MockObject -Type ([TotalSwitchClauseStatistics])
     }
     BeforeEach {
       Mock -CommandName Find-SwitchStatement -MockWith {return $clauseList}
-      Mock -CommandName Get-SwitchClauseStatistics -MockWith {return $stats}
+      Mock -CommandName Get-SwitchClauseStatistics -MockWith {return $stat}
       Mock -CommandName Measure-SwitchClauseStatistics `
         -MockWith {return $total}
     }
@@ -830,12 +830,16 @@ InModuleScope -ModuleName PSCodeStats {
       $clause = New-MockObject -Type $clauseType
       $clauseList.Add($clause)
 
-      $stats = New-MockObject -Type ([WhileClauseStatistics])
+      $stat = New-MockObject -Type ([WhileClauseStatistics])
+      $stat | Add-Member -Name WhileStatements `
+        -MemberType NoteProperty `
+        -Value 1 `
+        -Force
       $total = New-MockObject -Type ([TotalWhileClauseStatistics])
     }
     BeforeEach {
       Mock -CommandName Find-WhileStatement -MockWith {return $clauseList}
-      Mock -CommandName Get-WhileClauseStatistics -MockWith {return $stats}
+      Mock -CommandName Get-WhileClauseStatistics -MockWith {return $stat}
       Mock -CommandName Measure-WhileClauseStatistics `
         -MockWith {return $total}
     }
@@ -844,6 +848,8 @@ InModuleScope -ModuleName PSCodeStats {
       $result = Get-ScriptBlockWhileStatistics -ScriptBlock $emptySb
 
       $result | Should -BeOfType ([TotalWhileClauseStatistics])
+
+      Assert-MockCalled -CommandName Get-WhileClauseStatistics -Times 1 -Scope It
     }
     It 'Succesfully returns when no while statements are found' {
       Mock -CommandName Find-WhileStatement -MockWith {return $null}
