@@ -1,5 +1,6 @@
-Remove-Module -Name PSCodeStats -ErrorAction SilentlyContinue
-Import-Module -Name ./PSCodeStats.psd1
+$moduleName = 'PSCodeStats'
+Remove-Module -Name $moduleName -ErrorAction SilentlyContinue
+Import-Module -Name $moduleName
 
 
 InModuleScope -ModuleName PSCodeStats {
@@ -542,10 +543,10 @@ InModuleScope -ModuleName PSCodeStats {
 
   Describe 'Measure-IfStatementStatistics' {
     BeforeAll {
-      $measureType = 'Microsoft.PowerShell.Commands.GenericMeasureInfo'
+      $measureObjectType = 'Microsoft.PowerShell.Commands.GenericMeasureInfo'
     }
     BeforeEach {
-      $measure = New-MockObject -Type $measureType
+      $measure = New-MockObject -Type $measureObjectType
       $ifStats = New-MockObject -Type ([IfClauseStatistics])
 
       $measure | Add-Member -Name Sum `
@@ -565,10 +566,171 @@ InModuleScope -ModuleName PSCodeStats {
     It 'Successfully measures IfClauseStatistics' {
       $result = Measure-IfStatementStatistics -IfClauseStatistics $ifStats
 
-      $result | Should -Not -BeNullOrEmpty
+      $result | Should -BeOfType ([TotalIfClauseStatistics])
       $result.LargestStatementLineCount | Should -BeExactly 1
     }
   }
+
+  Describe 'Measure-TryCatchClauseStatistics' {
+    BeforeAll {
+      $measureObjectType = 'Microsoft.PowerShell.Commands.GenericMeasureInfo'
+    }
+    BeforeEach {
+      $measure = New-MockObject -Type $measureObjectType
+      $stats = New-MockObject -Type ([TryClauseStatistics])
+
+      $measure | Add-Member -Name Sum `
+        -MemberType NoteProperty `
+        -Value 1 `
+        -Force
+      $stats | Add-Member -Name GetLineCount `
+        -MemberType ScriptMethod `
+        -Value {return 1} `
+        -Force
+      $stats | Add-Member -Name HasFinally `
+        -MemberType NoteProperty `
+        -Value $true `
+        -Force
+
+      Mock -CommandName Measure-Object {
+        return $measure
+      }
+    }
+
+    It 'Successfully measure TryCatchStatistics' {
+      $result = Measure-TryCatchClauseStatistics -TryClauseStatistics $stats
+
+      $result | Should -BeOfType ([TotalTryClauseStatistics])
+      $result.LargestStatementLineCount | Should -BeExactly 1
+      $result.FinallyStatementTotal | Should -BeExactly 1
+    }
+  }
+
+  Describe 'Measure-SwitchClauseStatistics' {
+    BeforeAll {
+      $measureObjectType = 'Microsoft.PowerShell.Commands.GenericMeasureInfo'
+    }
+    BeforeEach {
+      $measure = New-MockObject -Type $measureObjectType
+      $stats = New-MockObject -Type ([SwitchClauseStatistics])
+
+      $measure | Add-Member -Name Sum `
+        -MemberType NoteProperty `
+        -Value 1 `
+        -Force
+      $stats | Add-Member -Name GetLineCount `
+        -MemberType ScriptMethod `
+        -Value {return 1} `
+        -Force
+      $stats | Add-Member -Name HasDefault `
+        -MemberType NoteProperty `
+        -Value $true `
+        -Force
+
+      Mock -CommandName Measure-Object {
+        return $measure
+      }
+    }
+
+    It 'Successfully measures SwitchClauseStatistics' {
+      $result = Measure-SwitchClauseStatistics -SwitchClauseStatistics $stats
+
+      $result | Should -BeOfType ([TotalSwitchClauseStatistics])
+      $result.DefaultClauseTotal | Should -BeExactly 1
+    }
+  }
+
+  Describe 'Measure-WhileClauseStatistics' {
+    BeforeAll {
+      $measureObjectType = 'Microsoft.PowerShell.Commands.GenericMeasureInfo'
+    }
+    BeforeEach {
+      $measure = New-MockObject -Type $measureObjectType
+      $stats = New-MockObject -Type ([WhileClauseStatistics])
+
+      $measure | Add-Member -Name Sum `
+        -MemberType NoteProperty `
+        -Value 1 `
+        -Force
+      $stats | Add-Member -Name GetLineCount `
+        -MemberType ScriptMethod `
+        -Value {return 1} `
+        -Force
+
+      Mock -CommandName Measure-Object {
+        return $measure
+      }
+    }
+
+    It 'Successfully measures WhileClauseStatistics' {
+      $result = Measure-WhileClauseStatistics -WhileClauseStatistics $stats
+
+      $result | Should -BeOfType ([TotalWhileClauseStatistics])
+    }
+  }
+
+  Describe 'Get-ScriptBlockCommandStatistics' {
+    BeforeAll {
+      $commandAstType = 'Management.Automation.Language.CommandAst'
+      $cmdType = 'Management.Automation.Language.StringConstantExpressionAst'
+      $varType = 'Management.Automation.Language.VariableExpressionAst'
+    }
+    BeforeEach {
+      $commandAst = New-MockObject -Type $commandAstType
+
+      $cmdElement = New-MockObject -Type $cmdType
+      $elementList = New-Object -TypeName Collections.Generic.List[$cmdType]
+      $elementList.Add($cmdElement)
+
+      $commandAst | Add-Member -Name CommandElements `
+        -MemberType NoteProperty `
+        -Value $elementList `
+        -Force
+    }
+
+    It 'Returns TotalCommandStatistics if no commands are found' {
+      Mock -CommandName Find-CommandStatement -MockWith {return $null}
+
+      $result = Get-ScriptBlockCommandStatistics -ScriptBlock $emptySb
+
+      $result | Should -BeOfType ([TotalCommandStatistics])
+      $result.CommandCount | Should -BeExactly 0
+    }
+
+    It 'Successfully measures script block command statistics' {
+      Mock -CommandName Find-CommandStatement -MockWith {
+        return $commandAst
+      }
+
+      $result = Get-ScriptBlockCommandStatistics -ScriptBlock $emptySb
+
+      $result | Should -BeOfType ([TotalCommandStatistics])
+      $result.CommandCount | Should -BeExactly $elementList.Count
+    }
+
+    It 'Successfully measures script block with Variable expression' {
+      $element = New-MockObject -Type $varType
+      $elements = New-Object -TypeName Collections.Generic.List[$varType]
+
+      $element | Add-Member -Name VariablePath `
+        -MemberType NoteProperty `
+        -Value (New-Object -TypeName PSObject -Property @{'UserPath' = 'a';}) `
+        -Force
+      $elements.Add($element)
+
+      $commandAst | Add-Member -Name CommandElements `
+        -MemberType NoteProperty `
+        -Value $elements `
+        -Force
+
+      Mock -CommandName Find-CommandStatement -MockWith {return $commandAst}
+
+      $result = Get-ScriptBlockCommandStatistics -ScriptBlock $emptySb
+
+      $result.CommandCount | Should -BeExactly $elements.Count
+    }
+  }
+
 }
 
 #  $mockFunction = {
