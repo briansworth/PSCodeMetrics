@@ -515,7 +515,7 @@ InModuleScope -ModuleName PSCodeStats {
         -Force
       $rCurly | Add-Member -Name Kind `
         -MemberType NoteProperty `
-        -Value $lCurlyKind `
+        -Value $rCurlyKind `
         -Force
     }
     BeforeEach {
@@ -730,6 +730,126 @@ InModuleScope -ModuleName PSCodeStats {
       $result.CommandCount | Should -BeExactly $elements.Count
     }
   }
+
+  Describe 'Get-ScriptBlockIfStatistics' {
+    BeforeAll {
+      $clauseType = 'Management.Automation.Language.IfStatementAst'
+      $clauseList = New-Object -TypeName Collections.Generic.List[$clauseType]
+      $clause = New-MockObject -Type $clauseType
+
+      $stats = New-MockObject -Type ([IfClauseStatistics])
+      $total = New-MockObject -Type ([TotalIfClauseStatistics])
+    }
+    BeforeEach {
+      Mock -CommandName Find-IfStatement -MockWith {return $clauseList}
+      Mock -CommandName Get-IfClauseStatistics -MockWith {return $stats}
+      Mock -CommandName Measure-IfStatementStatistics -MockWith {return $total}
+    }
+
+    It 'Succesfully returns when if statements are found' {
+      $result = Get-ScriptBlockIfStatistics -ScriptBlock $emptySb
+
+      $result | Should -BeOfType ([TotalIfClauseStatistics])
+    }
+    It 'Succesfully returns when no if statements are found' {
+      Mock -CommandName Find-IfStatement -MockWith {return $null}
+
+      $result = Get-ScriptBlockIfStatistics -ScriptBlock $emptySb
+
+      $result | Should -BeOfType ([TotalIfClauseStatistics])
+    }
+  }
+
+  Describe 'Get-ScriptBlockTryCatchStatistics' {
+    BeforeAll {
+      $clauseType = 'Management.Automation.Language.TryStatementAst'
+      $clauseList = New-Object -TypeName Collections.Generic.List[$clauseType]
+      $clause = New-MockObject -Type $clauseType
+
+      $stats = New-MockObject -Type ([TryClauseStatistics])
+      $total = New-MockObject -Type ([TotalTryClauseStatistics])
+    }
+    BeforeEach {
+      Mock -CommandName Find-TryStatement -MockWith {return $clauseList}
+      Mock -CommandName Get-TryCatchClauseStatistics -MockWith {return $stats}
+      Mock -CommandName Measure-TryCatchClauseStatistics `
+        -MockWith {return $total}
+    }
+
+    It 'Succesfully returns when Try/Catch statements are found' {
+      $result = Get-ScriptBlockTryCatchStatistics -ScriptBlock $emptySb
+
+      $result | Should -BeOfType ([TotalTryClauseStatistics])
+    }
+    It 'Succesfully returns when no Try/Catch statements are found' {
+      Mock -CommandName Find-TryStatement -MockWith {return $null}
+
+      $result = Get-ScriptBlockTryCatchStatistics -ScriptBlock $emptySb
+
+      $result | Should -BeOfType ([TotalTryClauseStatistics])
+    }
+  }
+
+  Describe 'Get-ScriptBlockSwitchStatistics' {
+    BeforeAll {
+      $clauseType = 'Management.Automation.Language.SwitchStatementAst'
+      $clauseList = New-Object -TypeName Collections.Generic.List[$clauseType]
+      $clause = New-MockObject -Type $clauseType
+
+      $stats = New-MockObject -Type ([SwitchClauseStatistics])
+      $total = New-MockObject -Type ([TotalSwitchClauseStatistics])
+    }
+    BeforeEach {
+      Mock -CommandName Find-SwitchStatement -MockWith {return $clauseList}
+      Mock -CommandName Get-SwitchClauseStatistics -MockWith {return $stats}
+      Mock -CommandName Measure-SwitchClauseStatistics `
+        -MockWith {return $total}
+    }
+
+    It 'Succesfully returns when switch statements are found' {
+      $result = Get-ScriptBlockSwitchStatistics -ScriptBlock $emptySb
+
+      $result | Should -BeOfType ([TotalSwitchClauseStatistics])
+    }
+    It 'Succesfully returns when no switch statements are found' {
+      Mock -CommandName Find-SwitchStatement -MockWith {return $null}
+
+      $result = Get-ScriptBlockSwitchStatistics -ScriptBlock $emptySb
+
+      $result | Should -BeOfType ([TotalSwitchClauseStatistics])
+    }
+  }
+
+  Describe 'Get-ScriptBlockWhileStatistics' {
+    BeforeAll {
+      $clauseType = 'Management.Automation.Language.WhileStatementAst'
+      $clauseList = New-Object -TypeName Collections.Generic.List[$clauseType]
+      $clause = New-MockObject -Type $clauseType
+
+      $stats = New-MockObject -Type ([WhileClauseStatistics])
+      $total = New-MockObject -Type ([TotalWhileClauseStatistics])
+    }
+    BeforeEach {
+      Mock -CommandName Find-WhileStatement -MockWith {return $clauseList}
+      Mock -CommandName Get-WhileClauseStatistics -MockWith {return $stats}
+      Mock -CommandName Measure-WhileClauseStatistics `
+        -MockWith {return $total}
+    }
+
+    It 'Succesfully returns when while statements are found' {
+      $result = Get-ScriptBlockWhileStatistics -ScriptBlock $emptySb
+
+      $result | Should -BeOfType ([TotalWhileClauseStatistics])
+    }
+    It 'Succesfully returns when no while statements are found' {
+      Mock -CommandName Find-WhileStatement -MockWith {return $null}
+
+      $result = Get-ScriptBlockWhileStatistics -ScriptBlock $emptySb
+
+      $result | Should -BeOfType ([TotalWhileClauseStatistics])
+    }
+  }
+
 
 }
 
