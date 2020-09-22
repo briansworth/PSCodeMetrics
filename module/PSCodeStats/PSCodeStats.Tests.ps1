@@ -736,6 +736,7 @@ InModuleScope -ModuleName PSCodeStats {
       $clauseType = 'Management.Automation.Language.IfStatementAst'
       $clauseList = New-Object -TypeName Collections.Generic.List[$clauseType]
       $clause = New-MockObject -Type $clauseType
+      $clauseList.Add($clause)
 
       $stats = New-MockObject -Type ([IfClauseStatistics])
       $total = New-MockObject -Type ([TotalIfClauseStatistics])
@@ -765,6 +766,7 @@ InModuleScope -ModuleName PSCodeStats {
       $clauseType = 'Management.Automation.Language.TryStatementAst'
       $clauseList = New-Object -TypeName Collections.Generic.List[$clauseType]
       $clause = New-MockObject -Type $clauseType
+      $clauseList.Add($clause)
 
       $stats = New-MockObject -Type ([TryClauseStatistics])
       $total = New-MockObject -Type ([TotalTryClauseStatistics])
@@ -795,6 +797,7 @@ InModuleScope -ModuleName PSCodeStats {
       $clauseType = 'Management.Automation.Language.SwitchStatementAst'
       $clauseList = New-Object -TypeName Collections.Generic.List[$clauseType]
       $clause = New-MockObject -Type $clauseType
+      $clauseList.Add($clause)
 
       $stats = New-MockObject -Type ([SwitchClauseStatistics])
       $total = New-MockObject -Type ([TotalSwitchClauseStatistics])
@@ -825,6 +828,7 @@ InModuleScope -ModuleName PSCodeStats {
       $clauseType = 'Management.Automation.Language.WhileStatementAst'
       $clauseList = New-Object -TypeName Collections.Generic.List[$clauseType]
       $clause = New-MockObject -Type $clauseType
+      $clauseList.Add($clause)
 
       $stats = New-MockObject -Type ([WhileClauseStatistics])
       $total = New-MockObject -Type ([TotalWhileClauseStatistics])
