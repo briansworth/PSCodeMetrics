@@ -728,6 +728,7 @@ InModuleScope -ModuleName PSCodeStats {
       $result = Get-ScriptBlockCommandStatistics -ScriptBlock $emptySb
 
       $result.CommandCount | Should -BeExactly $elements.Count
+      $result.ToString() | Should -BeOfType [string]
     }
   }
 
@@ -751,7 +752,9 @@ InModuleScope -ModuleName PSCodeStats {
       $result = Get-ScriptBlockIfStatistics -ScriptBlock $emptySb
 
       $result | Should -BeOfType ([TotalIfClauseStatistics])
+      $result.ToString() | Should -BeOfType [string]
     }
+
     It 'Succesfully returns when no if statements are found' {
       Mock -CommandName Find-IfStatement -MockWith {return $null}
 
@@ -971,7 +974,8 @@ InModuleScope -ModuleName PSCodeStats {
 #        {
 #          if ($null -like $false) # if (+1)
 #          {
-#            Get-Command -Name Get-Command
+#            Get-Command -Name Get-Command `
+#              -ErrorAction Stop
 #          }
 #          else
 #          {
