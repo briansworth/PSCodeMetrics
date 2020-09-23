@@ -860,7 +860,99 @@ InModuleScope -ModuleName PSCodeStats {
     }
   }
 
+  Describe 'ConvertTo-ScriptBlock' {
+    BeforeEach {
+      $mockCommand = New-MockObject Management.Automation.ApplicationInfo
+      $mockCommand | Add-Member -Name CommandType `
+        -MemberType NoteProperty `
+        -Value 'Function' `
+        -Force
 
+      Mock -CommandName Get-Command -MockWith {return $mockCommand}
+      Mock -CommandName Join-Path -MockWith {return 'path'}
+      Mock -CommandName Get-Content -MockWith {return $emptySb}
+    }
+
+    It 'Throws when command is not found' {
+      $emsg = 'Command Not Found'
+      $exceptType = 'Management.Automation.CommandNotFoundException'
+      Mock -CommandName Get-Command -MockWith {
+        $except = New-Object -TypeName $exceptType -ArgumentList @($emsg)
+        Write-Error -Exception $except
+      }
+
+      {ConvertTo-ScriptBlock -FunctionName 'Test' -ErrorAction Stop} |
+        Should -Throw $emsg -ExceptionType $exceptType
+    }
+
+    It 'Throws if command is not a function' {
+      $exceptType = 'Microsoft.PowerShell.Commands.WriteErrorException'
+      $mockCommand | Add-Member -Name CommandType `
+        -MemberType NoteProperty `
+        -Value 'Cmdlet' `
+        -Force
+      Mock -CommandName Get-Command -MockWith {return $mockCommand}
+
+      {ConvertTo-ScriptBlock -FunctionName 'Test' -ErrorAction Stop} |
+        Should -Throw -ExceptionType $exceptType
+    }
+
+    It 'Returns a script block if successful' {
+      $result = ConvertTo-ScriptBlock -FunctionName 'Test'
+
+      $result | Should -BeOfType [scriptblock]
+    }
+  }
+
+  Describe 'Get-FunctionStatistics' {
+    BeforeAll {
+      $ifs = New-MockObject -Type ([TotalIfClauseStatistics])
+      $trys = New-MockObject -Type ([TotalTryClauseStatistics])
+      $switches = New-MockObject -Type ([TotalSwitchClauseStatistics])
+      $whiles = New-MockObject -Type ([TotalWhileClauseStatistics])
+      $operators = New-MockObject -Type ([BoolOperatorStatistics])
+      $commands = New-MockObject -Type ([TotalCommandStatistics])
+    }
+    BeforeEach {
+      Mock -CommandName Get-ScriptBlockIfStatistics -MockWith {return $ifs}
+      Mock -CommandName Get-ScriptBlockTryCatchStatistics `
+        -MockWith {return $trys}
+      Mock -CommandName Get-ScriptBlockSwitchStatistics `
+        -MockWith {return $switches}
+      Mock -CommandName Get-ScriptBlockWhileStatistics `
+        -MockWith {return $whiles}
+      Mock -CommandName Get-BoolOperatorStatistics -MockWith {return $operators}
+      Mock -CommandName Get-ScriptBlockCommandStatistics `
+        -MockWith {return $commands}
+
+      Mock -CommandName ConvertTo-ScriptBlock -MockWith {return $emptySb}
+    }
+
+    It 'Successfully measures all components of scriptblock' {
+      $result = Get-FunctionStatistics -ScriptBlock $emptySb
+
+      $result | Should -BeOfType ([FunctionStatistics])
+      Assert-MockCalled -CommandName ConvertTo-ScriptBlock -Times 0 -Scope It
+    }
+
+    It 'Successfully measures function statistics' {
+      $result = Get-FunctionStatistics -FunctionName 'Test'
+
+      $result | Should -BeOfType ([FunctionStatistics])
+      Assert-MockCalled -CommandName ConvertTo-ScriptBlock -Times 1 -Scope It
+    }
+
+    It 'Throws if ConvertTo-ScriptBlock throws' {
+      $exceptType = 'Microsoft.PowerShell.Commands.WriteErrorException'
+      $emsg = 'Error'
+      Mock -CommandName ConvertTo-ScriptBlock -MockWith {
+        Write-Error -Message $emsg
+      }
+
+      {Get-FunctionStatistics -FunctionName 'Test' -ErrorAction Stop} |
+        Should -Throw $emsg -ExceptionType $exceptType
+    }
+  }
 }
 
 #  $mockFunction = {
@@ -937,4 +1029,3 @@ InModuleScope -ModuleName PSCodeStats {
 #      }
 #    }
 #  }
-#}
