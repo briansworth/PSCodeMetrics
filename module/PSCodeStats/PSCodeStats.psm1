@@ -81,6 +81,22 @@ Function Find-SwitchStatement
   return $switchStatement
 }
 
+Function Find-ForeachStatement
+{
+  [CmdletBinding()]
+  Param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [scriptblock]$ScriptBlock,
+
+    [switch]$IncludeNestedClause
+  )
+  $switchStatement = $ScriptBlock.Ast.FindAll(
+    {$args[0] -is [Management.Automation.Language.ForeachStatementAst]},
+    $IncludeNestedClause.ToBool()
+  )
+  return $switchStatement
+}
+
 
 class ClauseStatistics
 {
@@ -131,6 +147,14 @@ class WhileClauseStatistics: ClauseStatistics
 }
 
 
+class ForeachClauseStatistics: ClauseStatistics
+{
+  [int]$ForeachStatements
+  [string]$VariableName
+  [string]$Condition
+}
+
+
 Function New-ClauseStatisticsClassInstance
 {
   [CmdletBinding()]
@@ -141,6 +165,7 @@ Function New-ClauseStatisticsClassInstance
       'IfClauseStatistics',
       'TryCatchClauseStatistics',
       'SwitchClauseStatistics',
+      'ForeachClauseStatistics',
       'WhileClauseStatistics'
     )]
     [string]$TypeName = 'ClauseStatistics'
@@ -242,6 +267,25 @@ Function Get-WhileClauseStatistics
   $whileStats.EndLineNumber = $Clause.Extent.EndLineNumber
 
   return $whileStats
+}
+
+Function Get-ForeachClauseStatistics
+{
+  [CmdletBinding()]
+  Param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [Management.Automation.Language.ForeachStatementAst]$Clause
+  )
+  $foreachStats = New-Object -TypeName ForeachClauseStatistics
+
+  $foreachStats.ForeachStatements = 1
+  $foreachStats.CodePaths = 1
+  $foreachStats.VariableName = $Clause.Variable.Extent.Text
+  $foreachStats.Condition = $Clause.Condition.Extent.Text
+  $foreachStats.StartLineNumber = $Clause.Extent.StartLineNumber
+  $foreachStats.EndLineNumber = $Clause.Extent.EndLineNumber
+
+  return $foreachStats
 }
 
 Function Get-ScriptBlockToken
@@ -422,6 +466,14 @@ class TotalWhileClauseStatistics: TotalClauseStatistics
 }
 
 
+class TotalForeachClauseStatistics: TotalClauseStatistics
+{
+  [int]$ForeachStatementTotal
+  [string[]]$VariableNames
+  [string[]]$Conditions
+}
+
+
 Function Measure-IfStatementStatistics
 {
   [CmdletBinding()]
@@ -556,6 +608,41 @@ Function Measure-WhileClauseStatistics
   $totalStats.CodePathTotal = $codePaths.Sum
   $totalStats.WhileStatementTotal = $whiles.Count
   $totalStats.LargestStatementLineCount = $longestStatement
+
+  return $totalStats
+}
+
+Function Measure-ForeachClauseStatistics
+{
+  [CmdletBinding()]
+  Param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [ForeachClauseStatistics[]]$ForeachClauseStatistics
+  )
+  $longestStatement = 0
+
+  $codePaths = $ForeachClauseStatistics | Measure-Object -Property CodePaths -Sum
+  $foreachs = $ForeachClauseStatistics | Measure-Object
+  $variableNames = New-Object -TypeName Collections.Generic.List[string]
+  $conditions = New-Object -TypeName Collections.Generic.List[string]
+
+  foreach ($clause in $ForeachClauseStatistics)
+  {
+    $lineCount = $clause.GetLineCount()
+    if ($lineCount -gt $longestStatement)
+    {
+      $longestStatement = $lineCount
+    }
+    $variableNames.Add($clause.VariableName)
+    $conditions.Add($clause.Condition)
+  }
+
+  $totalStats = New-Object -TypeName TotalForeachClauseStatistics
+  $totalStats.CodePathTotal = $codePaths.Sum
+  $totalStats.LargestStatementLineCount = $longestStatement
+  $totalStats.ForeachStatementTotal = $foreachs.Count
+  $totalStats.VariableNames = $variableNames
+  $totalStats.Conditions = $conditions
 
   return $totalStats
 }
@@ -716,6 +803,35 @@ Function Get-ScriptBlockWhileStatistics
   return $totalStatistics
 }
 
+Function Get-ScriptBlockForeachStatistics
+{
+  [CmdletBinding()]
+  Param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [scriptblock]$ScriptBlock
+  )
+  $statsTypeName = 'ForeachClauseStatistics'
+  $foreachClause = Find-ForeachStatement -ScriptBlock $ScriptBlock `
+    -IncludeNestedClause
+
+  if ($null -eq $foreachClause)
+  {
+    $stats = New-Object -TypeName $statsTypeName
+  }
+  else
+  {
+    $stats = New-Object -TypeName "Collections.Generic.List[$statsTypeName]"
+    foreach ($clause in $foreachClause)
+    {
+      $statistics = Get-ForeachClauseStatistics -Clause $clause
+      [void]$stats.Add($statistics)
+    }
+  }
+
+  $totalStatistics = Measure-ForeachClauseStatistics -ForeachClauseStatistics $stats
+  return $totalStatistics
+}
+
 Function ConvertTo-ScriptBlock
 {
   [CmdletBinding()]
@@ -765,6 +881,7 @@ class FunctionStatistics
   [TotalTryClauseStatistics]$TryCatchStatistics
   [TotalSwitchClauseStatistics]$SwitchStatistics
   [TotalWhileClauseStatistics]$WhileStatistics
+  [TotalForeachClauseStatistics]$ForeachStatistics
   [BoolOperatorStatistics]$BoolOperatorStatistics
   [TotalCommandStatistics]$CommandStatistics
 }
@@ -828,6 +945,8 @@ Function Get-FunctionStatistics
       -ErrorAction Stop
     $whileStats = Get-ScriptBlockWhileStatistics -ScriptBlock $ScriptBlock `
       -ErrorAction Stop
+    $foreachStats = Get-ScriptBlockForeachStatistics -ScriptBlock $ScriptBlock `
+      -ErrorAction Stop
     $operatorStats = Get-BoolOperatorStatistics -ScriptBlock $ScriptBlock `
       -ErrorAction Stop
     $commandStats = Get-ScriptBlockCommandStatistics -ScriptBlock $ScriptBlock `
@@ -837,6 +956,7 @@ Function Get-FunctionStatistics
       $tryStats.CodePathTotal + `
       $switchStats.CodePathTotal + `
       $whileStats.CodePathTotal + `
+      $foreachStats.CodePathTotal + `
       $operatorStats.CodePaths + 1 # Always at least 1 code path
 
     $nestedDepth = Get-MaxNestedDepth -ScriptBlock $ScriptBlock `
@@ -852,6 +972,7 @@ Function Get-FunctionStatistics
     $functionStats.TryCatchStatistics = $tryStats
     $functionStats.SwitchStatistics = $switchStats
     $functionStats.WhileStatistics = $whileStats
+    $functionStats.ForeachStatistics = $foreachStats
     $functionStats.BoolOperatorStatistics = $operatorStats
     $functionStats.CommandStatistics = $commandStats
 

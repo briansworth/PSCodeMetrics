@@ -1013,6 +1013,10 @@ InModuleScope -ModuleName PSCodeStats {
 #          {
 #            # Do / While
 #          } while ($false -xor 1) # xor operator (+1)
+#          foreach ($test in @(0, 1)) # Foreach (+1)
+#          {
+#            continue
+#          }
 #        }
 #      }
 #      Catch [Runtime.InteropServices.ExternalException] # Typed Catch (+1)
