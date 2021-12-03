@@ -1,9 +1,9 @@
-$moduleName = 'PSCodeStats'
+$moduleName = 'PSCodeMetrics'
 Remove-Module -Name $moduleName -ErrorAction SilentlyContinue
 Import-Module -Name $moduleName
 
 
-InModuleScope -ModuleName PSCodeStats {
+InModuleScope -ModuleName PSCodeMetrics {
   BeforeAll {
     $emptySb = [scriptblock]::Create({})
     $mockExtent = New-Object -TypeName PSObject -Property @{
@@ -206,11 +206,11 @@ InModuleScope -ModuleName PSCodeStats {
     }
   }
 
-  Describe 'ClauseStatistics' {
+  Describe 'ClauseMetrics' {
     BeforeAll {
-      $type = 'ClauseStatistics'
-      $clauseStats = New-ClauseStatisticsClassInstance -TypeName $type
-      $clauseStats.CodePaths = 1
+      $type = 'ClauseMetrics'
+      $clauseStats = New-ClauseMetricsClassInstance -TypeName $type
+      $clauseStats.Cc = 1
       $clauseStats.StartLineNumber = 1
       $clauseStats.EndLineNumber = 1
     }
@@ -229,12 +229,12 @@ InModuleScope -ModuleName PSCodeStats {
         $str = $clauseStats.ToString()
 
         $str | Should -BeOfType [string]
-        $str | Should -BeLike '*CodePaths*'
+        $str | Should -BeLike '*Cc*'
       }
     }
   }
 
-  Describe 'Get-IfClauseStatistics' {
+  Describe 'Get-IfClauseMetrics' {
     BeforeAll {
       $ifType = 'Management.Automation.Language.IfStatementAst'
 
@@ -266,7 +266,7 @@ InModuleScope -ModuleName PSCodeStats {
 
     Context 'Has Else (no ElseIf)' {
       It 'Has correct Else count' {
-        $result = Get-IfClauseStatistics -Clause $mockElse
+        $result = Get-IfClauseMetrics -Clause $mockElse
 
         $result.IfStatements | Should -BeExactly 1
         $result.ElseStatements | Should -BeExactly 1
@@ -278,7 +278,7 @@ InModuleScope -ModuleName PSCodeStats {
 
     Context 'Has ElseIf (no Else)' {
       It 'Has correct ElseIf count' {
-        $result = Get-IfClauseStatistics -Clause $mockElseIf
+        $result = Get-IfClauseMetrics -Clause $mockElseIf
 
         $result.IfStatements | Should -BeExactly 1
         $result.ElseIfStatements | Should -BeExactly 1
@@ -287,7 +287,7 @@ InModuleScope -ModuleName PSCodeStats {
     }
   }
 
-  Describe 'Get-TryCatchClauseStatistics' {
+  Describe 'Get-TryCatchClauseMetrics' {
     BeforeEach {
       $tryType = 'Management.Automation.Language.TryStatementAst'
       $catchClauseType = 'Management.Automation.Language.CatchClauseAst'
@@ -311,7 +311,7 @@ InModuleScope -ModuleName PSCodeStats {
         -Value $mockFinally `
         -Force
 
-      $try = Get-TryCatchClauseStatistics -Clause $mockTry
+      $try = Get-TryCatchClauseMetrics -Clause $mockTry
 
       $try.HasFinally | Should -Be $true
     }
@@ -321,7 +321,7 @@ InModuleScope -ModuleName PSCodeStats {
         -Value @($mockCatch) `
         -Force
 
-      $try = Get-TryCatchClauseStatistics -Clause $mockTry
+      $try = Get-TryCatchClauseMetrics -Clause $mockTry
 
       $try.HasFinally | Should -Be $false
     }
@@ -339,7 +339,7 @@ InModuleScope -ModuleName PSCodeStats {
         -Value $mockFinally `
         -Force
 
-        $try = Get-TryCatchClauseStatistics -Clause $mockTry
+        $try = Get-TryCatchClauseMetrics -Clause $mockTry
 
         $try.CatchAllStatements | Should -BeExactly 1
     }
@@ -358,15 +358,15 @@ InModuleScope -ModuleName PSCodeStats {
         -Value $mockFinally `
         -Force
 
-        $try = Get-TryCatchClauseStatistics -Clause $mockTry
+        $try = Get-TryCatchClauseMetrics -Clause $mockTry
 
         $try.CatchAllStatements | Should -BeExactly 1
         $try.TypedCatchStatements | Should -BeExactly 1
-        $try.CodePaths | Should -BeExactly 2
+        $try.Cc | Should -BeExactly 2
     }
   }
 
-  Describe 'Get-SwitchClauseStatistics' {
+  Describe 'Get-SwitchClauseMetrics' {
     BeforeEach {
       $switchType = 'Management.Automation.Language.SwitchStatementAst'
       $mockSwitch = New-MockObject -Type $switchType
@@ -386,11 +386,11 @@ InModuleScope -ModuleName PSCodeStats {
         -Value @(1, 2, 3) `
         -Force
 
-      $result = Get-SwitchClauseStatistics -Clause $mockSwitch
+      $result = Get-SwitchClauseMetrics -Clause $mockSwitch
 
       $result.SwitchStatements | Should -BeExactly 1
       $result.SwitchClauses | Should -BeExactly 3
-      $result.CodePaths | Should -BeExactly 3
+      $result.Cc | Should -BeExactly 3
     }
 
     It 'Correctly identifies default clause (true)' {
@@ -399,18 +399,18 @@ InModuleScope -ModuleName PSCodeStats {
         -Value 1 `
         -Force
 
-      $result = Get-SwitchClauseStatistics -Clause $mockSwitch
+      $result = Get-SwitchClauseMetrics -Clause $mockSwitch
 
       $result.HasDefault | Should -Be $true
     }
     It 'Correctly identifies default clause (false)' {
-      $result = Get-SwitchClauseStatistics -Clause $mockSwitch
+      $result = Get-SwitchClauseMetrics -Clause $mockSwitch
 
       $result.HasDefault | Should -Be $false
     }
   }
 
-  Describe 'Get-WhileClauseStatistics' {
+  Describe 'Get-WhileClauseMetrics' {
     BeforeEach {
       $whileClauseType = 'Management.Automation.Language.WhileStatementAst'
       $mockWhile = New-MockObject -Type $whileClauseType
@@ -419,11 +419,11 @@ InModuleScope -ModuleName PSCodeStats {
         -Value $mockExtent `
         -Force
     }
-    It 'Calculates correct number of CodePaths' {
-      $result = Get-WhileClauseStatistics -Clause $mockWhile
+    It 'Calculates correct Cc' {
+      $result = Get-WhileClauseMetrics -Clause $mockWhile
 
       $result.WhileStatements | Should -BeExactly 1
-      $result.CodePaths | Should -BeExactly 1
+      $result.Cc | Should -BeExactly 1
     }
   }
 
@@ -461,16 +461,16 @@ InModuleScope -ModuleName PSCodeStats {
     }
   }
 
-  Describe 'Get-BoolOperatorStatistics' {
+  Describe 'Get-BoolOperatorMetrics' {
     BeforeEach {
       $mockToken = New-MockObject -Type 'Management.Automation.Language.Token'
       Mock -CommandName Get-ScriptBlockToken -MockWith {return}
     }
 
     It 'Properly handles no returned tokens' {
-      $result = Get-BoolOperatorStatistics -ScriptBlock $emptySb
+      $result = Get-BoolOperatorMetrics -ScriptBlock $emptySb
 
-      $result.CodePaths | Should -BeExactly 0
+      $result.Cc | Should -BeExactly 0
     }
 
     It 'Reports proper code path count' {
@@ -487,14 +487,14 @@ InModuleScope -ModuleName PSCodeStats {
       }
       Mock -CommandName Get-ScriptBlockToken -MockWith {return $mockTokens}
 
-      $result = Get-BoolOperatorStatistics -ScriptBlock $emptySb
+      $result = Get-BoolOperatorMetrics -ScriptBlock $emptySb
 
-      $result.CodePaths | Should -BeExactly 3
+      $result.Cc | Should -BeExactly 3
     }
 
-    Context 'BoolOperatorStatistics ToString' {
+    Context 'BoolOperatorMetrics ToString' {
       It 'Should return a string with ToString' {
-        $result = Get-BoolOperatorStatistics -ScriptBlock $emptySb
+        $result = Get-BoolOperatorMetrics -ScriptBlock $emptySb
 
         $result.ToString() | Should -BeOfType [string]
       }
@@ -541,13 +541,13 @@ InModuleScope -ModuleName PSCodeStats {
     }
   }
 
-  Describe 'Measure-IfStatementStatistics' {
+  Describe 'Measure-IfStatementMetrics' {
     BeforeAll {
       $measureObjectType = 'Microsoft.PowerShell.Commands.GenericMeasureInfo'
     }
     BeforeEach {
       $measure = New-MockObject -Type $measureObjectType
-      $ifStats = New-MockObject -Type ([IfClauseStatistics])
+      $ifStats = New-MockObject -Type ([IfClauseMetrics])
 
       $measure | Add-Member -Name Sum `
         -MemberType NoteProperty `
@@ -563,21 +563,21 @@ InModuleScope -ModuleName PSCodeStats {
       }
     }
 
-    It 'Successfully measures IfClauseStatistics' {
-      $result = Measure-IfStatementStatistics -IfClauseStatistics $ifStats
+    It 'Successfully measures IfClauseMetrics' {
+      $result = Measure-IfStatementMetrics -IfClauseMetrics $ifStats
 
-      $result | Should -BeOfType ([TotalIfClauseStatistics])
+      $result | Should -BeOfType ([TotalIfClauseMetrics])
       $result.LargestStatementLineCount | Should -BeExactly 1
     }
   }
 
-  Describe 'Measure-TryCatchClauseStatistics' {
+  Describe 'Measure-TryCatchClauseMetrics' {
     BeforeAll {
       $measureObjectType = 'Microsoft.PowerShell.Commands.GenericMeasureInfo'
     }
     BeforeEach {
       $measure = New-MockObject -Type $measureObjectType
-      $stats = New-MockObject -Type ([TryClauseStatistics])
+      $stats = New-MockObject -Type ([TryClauseMetrics])
 
       $measure | Add-Member -Name Sum `
         -MemberType NoteProperty `
@@ -597,22 +597,22 @@ InModuleScope -ModuleName PSCodeStats {
       }
     }
 
-    It 'Successfully measure TryCatchStatistics' {
-      $result = Measure-TryCatchClauseStatistics -TryClauseStatistics $stats
+    It 'Successfully measure TryCatchMetrics' {
+      $result = Measure-TryCatchClauseMetrics -TryClauseMetrics $stats
 
-      $result | Should -BeOfType ([TotalTryClauseStatistics])
+      $result | Should -BeOfType ([TotalTryClauseMetrics])
       $result.LargestStatementLineCount | Should -BeExactly 1
       $result.FinallyStatementTotal | Should -BeExactly 1
     }
   }
 
-  Describe 'Measure-SwitchClauseStatistics' {
+  Describe 'Measure-SwitchClauseMetrics' {
     BeforeAll {
       $measureObjectType = 'Microsoft.PowerShell.Commands.GenericMeasureInfo'
     }
     BeforeEach {
       $measure = New-MockObject -Type $measureObjectType
-      $stats = New-MockObject -Type ([SwitchClauseStatistics])
+      $stats = New-MockObject -Type ([SwitchClauseMetrics])
 
       $measure | Add-Member -Name Sum `
         -MemberType NoteProperty `
@@ -632,21 +632,21 @@ InModuleScope -ModuleName PSCodeStats {
       }
     }
 
-    It 'Successfully measures SwitchClauseStatistics' {
-      $result = Measure-SwitchClauseStatistics -SwitchClauseStatistics $stats
+    It 'Successfully measures SwitchClauseMetrics' {
+      $result = Measure-SwitchClauseMetrics -SwitchClauseMetrics $stats
 
-      $result | Should -BeOfType ([TotalSwitchClauseStatistics])
+      $result | Should -BeOfType ([TotalSwitchClauseMetrics])
       $result.DefaultClauseTotal | Should -BeExactly 1
     }
   }
 
-  Describe 'Measure-WhileClauseStatistics' {
+  Describe 'Measure-WhileClauseMetrics' {
     BeforeAll {
       $measureObjectType = 'Microsoft.PowerShell.Commands.GenericMeasureInfo'
     }
     BeforeEach {
       $measure = New-MockObject -Type $measureObjectType
-      $stats = New-MockObject -Type ([WhileClauseStatistics])
+      $stats = New-MockObject -Type ([WhileClauseMetrics])
 
       $measure | Add-Member -Name Sum `
         -MemberType NoteProperty `
@@ -662,14 +662,14 @@ InModuleScope -ModuleName PSCodeStats {
       }
     }
 
-    It 'Successfully measures WhileClauseStatistics' {
-      $result = Measure-WhileClauseStatistics -WhileClauseStatistics $stats
+    It 'Successfully measures WhileClauseMetrics' {
+      $result = Measure-WhileClauseMetrics -WhileClauseMetrics $stats
 
-      $result | Should -BeOfType ([TotalWhileClauseStatistics])
+      $result | Should -BeOfType ([TotalWhileClauseMetrics])
     }
   }
 
-  Describe 'Get-ScriptBlockCommandStatistics' {
+  Describe 'Get-ScriptBlockCommandMetrics' {
     BeforeAll {
       $commandAstType = 'Management.Automation.Language.CommandAst'
       $cmdType = 'Management.Automation.Language.StringConstantExpressionAst'
@@ -688,12 +688,12 @@ InModuleScope -ModuleName PSCodeStats {
         -Force
     }
 
-    It 'Returns TotalCommandStatistics if no commands are found' {
+    It 'Returns TotalCommandMetrics if no commands are found' {
       Mock -CommandName Find-CommandStatement -MockWith {return $null}
 
-      $result = Get-ScriptBlockCommandStatistics -ScriptBlock $emptySb
+      $result = Get-ScriptBlockCommandMetrics -ScriptBlock $emptySb
 
-      $result | Should -BeOfType ([TotalCommandStatistics])
+      $result | Should -BeOfType ([TotalCommandMetrics])
       $result.CommandCount | Should -BeExactly 0
     }
 
@@ -702,9 +702,9 @@ InModuleScope -ModuleName PSCodeStats {
         return $commandAst
       }
 
-      $result = Get-ScriptBlockCommandStatistics -ScriptBlock $emptySb
+      $result = Get-ScriptBlockCommandMetrics -ScriptBlock $emptySb
 
-      $result | Should -BeOfType ([TotalCommandStatistics])
+      $result | Should -BeOfType ([TotalCommandMetrics])
       $result.CommandCount | Should -BeExactly $elementList.Count
     }
 
@@ -725,147 +725,147 @@ InModuleScope -ModuleName PSCodeStats {
 
       Mock -CommandName Find-CommandStatement -MockWith {return $commandAst}
 
-      $result = Get-ScriptBlockCommandStatistics -ScriptBlock $emptySb
+      $result = Get-ScriptBlockCommandMetrics -ScriptBlock $emptySb
 
       $result.CommandCount | Should -BeExactly $elements.Count
       $result.ToString() | Should -BeOfType [string]
     }
   }
 
-  Describe 'Get-ScriptBlockIfStatistics' {
+  Describe 'Get-ScriptBlockIfMetrics' {
     BeforeAll {
       $clauseType = 'Management.Automation.Language.IfStatementAst'
       $clauseList = New-Object -TypeName Collections.Generic.List[$clauseType]
       $clause = New-MockObject -Type $clauseType
       $clauseList.Add($clause)
 
-      $stat = New-MockObject -Type ([IfClauseStatistics])
-      $total = New-MockObject -Type ([TotalIfClauseStatistics])
+      $stat = New-MockObject -Type ([IfClauseMetrics])
+      $total = New-MockObject -Type ([TotalIfClauseMetrics])
     }
     BeforeEach {
       Mock -CommandName Find-IfStatement -MockWith {return $clauseList}
-      Mock -CommandName Get-IfClauseStatistics -MockWith {return $stat}
-      Mock -CommandName Measure-IfStatementStatistics -MockWith {return $total}
+      Mock -CommandName Get-IfClauseMetrics -MockWith {return $stat}
+      Mock -CommandName Measure-IfStatementMetrics -MockWith {return $total}
     }
 
     It 'Succesfully returns when if statements are found' {
-      $result = Get-ScriptBlockIfStatistics -ScriptBlock $emptySb
+      $result = Get-ScriptBlockIfMetrics -ScriptBlock $emptySb
 
-      $result | Should -BeOfType ([TotalIfClauseStatistics])
+      $result | Should -BeOfType ([TotalIfClauseMetrics])
       $result.ToString() | Should -BeOfType [string]
     }
 
     It 'Succesfully returns when no if statements are found' {
       Mock -CommandName Find-IfStatement -MockWith {return $null}
 
-      $result = Get-ScriptBlockIfStatistics -ScriptBlock $emptySb
+      $result = Get-ScriptBlockIfMetrics -ScriptBlock $emptySb
 
-      $result | Should -BeOfType ([TotalIfClauseStatistics])
+      $result | Should -BeOfType ([TotalIfClauseMetrics])
     }
   }
 
-  Describe 'Get-ScriptBlockTryCatchStatistics' {
+  Describe 'Get-ScriptBlockTryCatchMetrics' {
     BeforeAll {
       $clauseType = 'Management.Automation.Language.TryStatementAst'
       $clauseList = New-Object -TypeName Collections.Generic.List[$clauseType]
       $clause = New-MockObject -Type $clauseType
       $clauseList.Add($clause)
 
-      $stat = New-MockObject -Type ([TryClauseStatistics])
-      $total = New-MockObject -Type ([TotalTryClauseStatistics])
+      $stat = New-MockObject -Type ([TryClauseMetrics])
+      $total = New-MockObject -Type ([TotalTryClauseMetrics])
     }
     BeforeEach {
       Mock -CommandName Find-TryStatement -MockWith {return $clauseList}
-      Mock -CommandName Get-TryCatchClauseStatistics -MockWith {return $stat}
-      Mock -CommandName Measure-TryCatchClauseStatistics `
+      Mock -CommandName Get-TryCatchClauseMetrics -MockWith {return $stat}
+      Mock -CommandName Measure-TryCatchClauseMetrics `
         -MockWith {return $total}
     }
 
     It 'Succesfully returns when Try/Catch statements are found' {
-      $result = Get-ScriptBlockTryCatchStatistics -ScriptBlock $emptySb
+      $result = Get-ScriptBlockTryCatchMetrics -ScriptBlock $emptySb
 
-      $result | Should -BeOfType ([TotalTryClauseStatistics])
+      $result | Should -BeOfType ([TotalTryClauseMetrics])
     }
     It 'Succesfully returns when no Try/Catch statements are found' {
       Mock -CommandName Find-TryStatement -MockWith {return $null}
 
-      $result = Get-ScriptBlockTryCatchStatistics -ScriptBlock $emptySb
+      $result = Get-ScriptBlockTryCatchMetrics -ScriptBlock $emptySb
 
-      $result | Should -BeOfType ([TotalTryClauseStatistics])
+      $result | Should -BeOfType ([TotalTryClauseMetrics])
     }
   }
 
-  Describe 'Get-ScriptBlockSwitchStatistics' {
+  Describe 'Get-ScriptBlockSwitchMetrics' {
     BeforeAll {
       $clauseType = 'Management.Automation.Language.SwitchStatementAst'
       $clauseList = New-Object -TypeName Collections.Generic.List[$clauseType]
       $clause = New-MockObject -Type $clauseType
       $clauseList.Add($clause)
 
-      $stat = New-MockObject -Type ([SwitchClauseStatistics])
-      $total = New-MockObject -Type ([TotalSwitchClauseStatistics])
+      $stat = New-MockObject -Type ([SwitchClauseMetrics])
+      $total = New-MockObject -Type ([TotalSwitchClauseMetrics])
     }
     BeforeEach {
       Mock -CommandName Find-SwitchStatement -MockWith {return $clauseList}
-      Mock -CommandName Get-SwitchClauseStatistics -MockWith {return $stat}
-      Mock -CommandName Measure-SwitchClauseStatistics `
+      Mock -CommandName Get-SwitchClauseMetrics -MockWith {return $stat}
+      Mock -CommandName Measure-SwitchClauseMetrics `
         -MockWith {return $total}
     }
 
     It 'Succesfully returns when switch statements are found' {
-      $result = Get-ScriptBlockSwitchStatistics -ScriptBlock $emptySb
+      $result = Get-ScriptBlockSwitchMetrics -ScriptBlock $emptySb
 
-      $result | Should -BeOfType ([TotalSwitchClauseStatistics])
+      $result | Should -BeOfType ([TotalSwitchClauseMetrics])
     }
     It 'Succesfully returns when no switch statements are found' {
       Mock -CommandName Find-SwitchStatement -MockWith {return $null}
 
-      $result = Get-ScriptBlockSwitchStatistics -ScriptBlock $emptySb
+      $result = Get-ScriptBlockSwitchMetrics -ScriptBlock $emptySb
 
-      $result | Should -BeOfType ([TotalSwitchClauseStatistics])
+      $result | Should -BeOfType ([TotalSwitchClauseMetrics])
     }
   }
 
-  Describe 'Get-ScriptBlockWhileStatistics' {
+  Describe 'Get-ScriptBlockWhileMetrics' {
     BeforeAll {
       $clauseType = 'Management.Automation.Language.WhileStatementAst'
       $clauseList = New-Object -TypeName Collections.Generic.List[$clauseType]
       $clause = New-MockObject -Type $clauseType
       $clauseList.Add($clause)
 
-      $stat = New-MockObject -Type ([WhileClauseStatistics])
+      $stat = New-MockObject -Type ([WhileClauseMetrics])
       $stat | Add-Member -Name WhileStatements `
         -MemberType NoteProperty `
         -Value 1 `
         -Force
-      $total = New-MockObject -Type ([TotalWhileClauseStatistics])
+      $total = New-MockObject -Type ([TotalWhileClauseMetrics])
     }
     BeforeEach {
       Mock -CommandName Find-WhileStatement -MockWith {return $clauseList}
-      Mock -CommandName Get-WhileClauseStatistics -MockWith {return $stat}
-      Mock -CommandName Measure-WhileClauseStatistics `
+      Mock -CommandName Get-WhileClauseMetrics -MockWith {return $stat}
+      Mock -CommandName Measure-WhileClauseMetrics `
         -MockWith {return $total}
     }
 
     It 'Succesfully returns when while statements are found' {
-      $result = Get-ScriptBlockWhileStatistics -ScriptBlock $emptySb
+      $result = Get-ScriptBlockWhileMetrics -ScriptBlock $emptySb
 
-      $result | Should -BeOfType ([TotalWhileClauseStatistics])
+      $result | Should -BeOfType ([TotalWhileClauseMetrics])
 
-      Assert-MockCalled -CommandName Get-WhileClauseStatistics -Times 1 -Scope It
+      Assert-MockCalled -CommandName Get-WhileClauseMetrics -Times 1 -Scope It
     }
     It 'Succesfully returns when no while statements are found' {
       Mock -CommandName Find-WhileStatement -MockWith {return $null}
 
-      $result = Get-ScriptBlockWhileStatistics -ScriptBlock $emptySb
+      $result = Get-ScriptBlockWhileMetrics -ScriptBlock $emptySb
 
-      $result | Should -BeOfType ([TotalWhileClauseStatistics])
+      $result | Should -BeOfType ([TotalWhileClauseMetrics])
     }
   }
 
   Describe 'ConvertTo-ScriptBlock' {
     BeforeEach {
-      $mockCommand = New-MockObject Management.Automation.ApplicationInfo
+      $mockCommand = New-MockObject -Type Management.Automation.ApplicationInfo
       $mockCommand | Add-Member -Name CommandType `
         -MemberType NoteProperty `
         -Value 'Function' `
@@ -907,41 +907,41 @@ InModuleScope -ModuleName PSCodeStats {
     }
   }
 
-  Describe 'Get-FunctionStatistics' {
+  Describe 'Get-FunctionMetrics' {
     BeforeAll {
-      $ifs = New-MockObject -Type ([TotalIfClauseStatistics])
-      $trys = New-MockObject -Type ([TotalTryClauseStatistics])
-      $switches = New-MockObject -Type ([TotalSwitchClauseStatistics])
-      $whiles = New-MockObject -Type ([TotalWhileClauseStatistics])
-      $operators = New-MockObject -Type ([BoolOperatorStatistics])
-      $commands = New-MockObject -Type ([TotalCommandStatistics])
+      $ifs = New-MockObject -Type ([TotalIfClauseMetrics])
+      $trys = New-MockObject -Type ([TotalTryClauseMetrics])
+      $switches = New-MockObject -Type ([TotalSwitchClauseMetrics])
+      $whiles = New-MockObject -Type ([TotalWhileClauseMetrics])
+      $operators = New-MockObject -Type ([BoolOperatorMetrics])
+      $commands = New-MockObject -Type ([TotalCommandMetrics])
     }
     BeforeEach {
-      Mock -CommandName Get-ScriptBlockIfStatistics -MockWith {return $ifs}
-      Mock -CommandName Get-ScriptBlockTryCatchStatistics `
+      Mock -CommandName Get-ScriptBlockIfMetrics -MockWith {return $ifs}
+      Mock -CommandName Get-ScriptBlockTryCatchMetrics `
         -MockWith {return $trys}
-      Mock -CommandName Get-ScriptBlockSwitchStatistics `
+      Mock -CommandName Get-ScriptBlockSwitchMetrics `
         -MockWith {return $switches}
-      Mock -CommandName Get-ScriptBlockWhileStatistics `
+      Mock -CommandName Get-ScriptBlockWhileMetrics `
         -MockWith {return $whiles}
-      Mock -CommandName Get-BoolOperatorStatistics -MockWith {return $operators}
-      Mock -CommandName Get-ScriptBlockCommandStatistics `
+      Mock -CommandName Get-BoolOperatorMetrics -MockWith {return $operators}
+      Mock -CommandName Get-ScriptBlockCommandMetrics `
         -MockWith {return $commands}
 
       Mock -CommandName ConvertTo-ScriptBlock -MockWith {return $emptySb}
     }
 
     It 'Successfully measures all components of scriptblock' {
-      $result = Get-FunctionStatistics -ScriptBlock $emptySb
+      $result = Get-FunctionMetrics -ScriptBlock $emptySb
 
-      $result | Should -BeOfType ([FunctionStatistics])
+      $result | Should -BeOfType ([FunctionMetrics])
       Assert-MockCalled -CommandName ConvertTo-ScriptBlock -Times 0 -Scope It
     }
 
     It 'Successfully measures function statistics' {
-      $result = Get-FunctionStatistics -FunctionName 'Test'
+      $result = Get-FunctionMetrics -FunctionName 'Test'
 
-      $result | Should -BeOfType ([FunctionStatistics])
+      $result | Should -BeOfType ([FunctionMetrics])
       Assert-MockCalled -CommandName ConvertTo-ScriptBlock -Times 1 -Scope It
     }
 
@@ -952,7 +952,7 @@ InModuleScope -ModuleName PSCodeStats {
         Write-Error -Message $emsg
       }
 
-      {Get-FunctionStatistics -FunctionName 'Test' -ErrorAction Stop} |
+      {Get-FunctionMetrics -FunctionName 'Test' -ErrorAction Stop} |
         Should -Throw $emsg -ExceptionType $exceptType
     }
   }

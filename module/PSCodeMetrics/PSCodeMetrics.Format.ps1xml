@@ -2,9 +2,9 @@
 <Configuration>
     <ViewDefinitions>
         <View>
-            <Name>FunctionStatistics</Name>
+            <Name>FunctionMetrics</Name>
             <ViewSelectedBy>
-                <TypeName>FunctionStatistics</TypeName>
+                <TypeName>FunctionMetrics</TypeName>
             </ViewSelectedBy>
             <TableControl>
                 <TableHeaders>
@@ -12,7 +12,7 @@
                         <Label>Name</Label>
                     </TableColumnHeader>
                     <TableColumnHeader>
-                        <Label>CodePathTotal</Label>
+                        <Label>Cc</Label>
                         <Width>13</Width>
                         <Alignment>Right</Alignment>
                     </TableColumnHeader>
@@ -39,7 +39,7 @@
                                 <PropertyName>Name</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>CodePathTotal</PropertyName>
+                                <PropertyName>Cc</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
                                 <PropertyName>MaxNestedDepth</PropertyName>
