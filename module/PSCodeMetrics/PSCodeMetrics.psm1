@@ -93,7 +93,8 @@ function ConvertTo-ScriptBlock
         $FunctionName,
         $command.CommandType
       )
-      Write-Error -Message $emsg -Category InvalidType -ErrorAction Stop
+      $exception = [ArgumentException]::new($emsg)
+      Write-Error -Exception $exception -Category InvalidArgument -ErrorAction Stop
     }
     $functionPath = Join-Path -Path Function: -ChildPath $FunctionName
     $scriptBlock = Get-Content -Path $functionPath -ErrorAction Stop
@@ -105,7 +106,8 @@ function ConvertTo-ScriptBlock
       'Function: [{0}] does not exist or is not imported into the session',
       $FunctionName
     )
-    Write-Error -Message $emsg -Exception $_.Exception -Category InvalidArgument
+    $exception = [ArgumentException]::new($emsg, $_.Exception)
+    Write-Error -Exception $exception -Category InvalidArgument
   }
   catch
   {
@@ -132,35 +134,28 @@ function Get-MaxNestedDepth
     [Parameter(Position=0, Mandatory=$true)]
     [scriptblock]$ScriptBlock
   )
-  try
-  {
-    $max = 0
-    $stack = New-Object -TypeName Collections.Stack
+  $max = 0
+  $stack = New-Object -TypeName Collections.Stack
 
-    $curlyTokens = Get-ScriptBlockToken -ScriptBlock $ScriptBlock `
-      -TokenKind AtCurly, LCurly, RCurly `
-      -ErrorAction Stop
+  $curlyTokens = Get-ScriptBlockToken -ScriptBlock $ScriptBlock `
+    -TokenKind AtCurly, LCurly, RCurly `
+    -ErrorAction Stop
 
-    foreach ($token in $curlyTokens){
-      if ($token.Kind -in @('AtCurly', 'LCurly'))
-      {
-        $stack.Push($token)
-      }
-      elseif ($token.Kind -eq 'RCurly')
-      {
-        [void]$stack.Pop()
-      }
-      if ($stack.Count -gt $max)
-      {
-        $max++
-      }
+  foreach ($token in $curlyTokens){
+    if ($token.Kind -in @('AtCurly', 'LCurly'))
+    {
+      $stack.Push($token)
     }
-    return $max
+    elseif ($token.Kind -eq 'RCurly')
+    {
+      [void]$stack.Pop()
+    }
+    if ($stack.Count -gt $max)
+    {
+      $max++
+    }
   }
-  catch
-  {
-    Write-Error -ErrorRecord $_
-  }
+  return $max
 }
 
 function Get-ScriptBlockCommandMetrics
@@ -222,6 +217,8 @@ function Get-ScriptBlockCyclomaticComplexity
       -ErrorAction Stop
     $whileMetric = Get-ScriptBlockWhileMetrics -ScriptBlock $ScriptBlock `
       -ErrorAction Stop
+    $trapMetric = Get-ScriptBlockTrapMetrics -ScriptBlock $ScriptBlock `
+      -ErrorAction Stop
     $operatorMetric = Get-BoolOperatorMetrics -ScriptBlock $ScriptBlock `
       -ErrorAction Stop
 
@@ -231,6 +228,7 @@ function Get-ScriptBlockCyclomaticComplexity
       $tryMetric.Cc + `
       $switchMetric.Cc + `
       $whileMetric.Cc + `
+      $trapMetric.Cc + `
       $operatorMetric.Cc + 1 # Always at least 1 code path
 
     $cCMetrics = [CyclomaticComplexityMetrics]@{
@@ -241,6 +239,7 @@ function Get-ScriptBlockCyclomaticComplexity
       'TryCatch' = $tryMetric;
       'Switch' = $switchMetric;
       'While' = $whileMetric;
+      'Trap' = $trapMetric;
       'BoolOperator' = $operatorMetric;
     }
     return $cCMetrics
@@ -256,6 +255,7 @@ class CyclomaticComplexityMetrics
   [TotalTryClauseMetrics]$TryCatch
   [TotalSwitchClauseMetrics]$Switch
   [TotalWhileClauseMetrics]$While
+  [TotalTrapClauseMetrics]$Trap
   [BoolOperatorMetrics]$BoolOperator
 }
 
@@ -430,6 +430,35 @@ function Get-ScriptBlockWhileMetrics
   }
 
   $totalMetrics = Measure-WhileClauseMetrics -WhileClauseMetrics $metrics
+  return $totalMetrics
+}
+
+function Get-ScriptBlockTrapMetrics
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [scriptblock]$ScriptBlock
+  )
+  $typeName = 'TrapClauseMetrics'
+  $trapClause = Find-TrapStatement -ScriptBlock $ScriptBlock `
+    -IncludeNestedClause
+
+  if ($null -eq $trapClause)
+  {
+    $metrics = New-Object -TypeName $typeName
+  }
+  else
+  {
+    $metrics = New-Object -TypeName "Collections.Generic.List[$typeName]"
+    foreach ($clause in $trapClause)
+    {
+      $metric = Get-TrapClauseMetrics -Clause $clause
+      [void]$metrics.Add($metric)
+    }
+  }
+
+  $totalMetrics = Measure-TrapClauseMetrics -TrapClauseMetrics $metrics
   return $totalMetrics
 }
 
@@ -702,6 +731,38 @@ function Measure-WhileClauseMetrics
   return $totalMetrics
 }
 
+function Measure-TrapClauseMetrics
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [TrapClauseMetrics[]]$TrapClauseMetrics
+  )
+  $longestStatement = 0
+
+  $codePaths = $TrapClauseMetrics | Measure-Object -Property Cc -Sum
+  $traps = $TrapClauseMetrics | Measure-Object
+  $trapTypes = New-Object -TypeName Collections.Generic.List[string]
+
+  foreach ($clause in $TrapClauseMetrics)
+  {
+    $lineCount = $clause.GetLineCount()
+    if ($lineCount -gt $longestStatement)
+    {
+      $longestStatement = $lineCount
+    }
+    $trapTypes.Add($clause.Type)
+  }
+
+  $totalMetrics = [TotalTrapClauseMetrics]@{
+    'Cc' = $codePaths.Sum;
+    'TrapStatementTotal' = $traps.Count;
+    'TrapTypes' = $trapTypes;
+    'LargestStatementLineCount' = $longestStatement;
+  }
+  return $totalMetrics
+}
+
 
 class TotalCommandMetrics
 {
@@ -774,6 +835,12 @@ class TotalSwitchClauseMetrics: TotalClauseMetrics
 class TotalWhileClauseMetrics: TotalClauseMetrics
 {
   [int]$WhileStatementTotal
+}
+
+class TotalTrapClauseMetrics: TotalClauseMetrics
+{
+  [int]$TrapStatementTotal
+  [string[]]$TrapTypes
 }
 
 function Get-IfClauseMetrics
@@ -928,6 +995,29 @@ function Get-WhileClauseMetrics
   return $metrics
 }
 
+function Get-TrapClauseMetrics
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [Management.Automation.Language.TrapStatementAst]$Clause
+  )
+  $trapType = [string]::Empty
+  if ($null -ne $Clause.TrapType)
+  {
+    $trapType = $Clause.TrapType.ToString()
+  }
+
+  $metrics = [TrapClauseMetrics]@{
+    'TrapStatements' = 1;
+    'Cc' = 1;
+    'Type' = $trapType;
+    'StartLineNumber' = $Clause.Extent.StartLineNumber;
+    'EndLineNumber' = $Clause.Extent.EndLineNumber;
+  }
+  return $metrics
+}
+
 
 class ClauseMetrics
 {
@@ -992,6 +1082,13 @@ class SwitchClauseMetrics: ClauseMetrics
 class WhileClauseMetrics: ClauseMetrics
 {
   [int]$WhileStatements
+}
+
+
+class TrapClauseMetrics: ClauseMetrics
+{
+  [int]$TrapStatements
+  [string]$Type
 }
 
 function Find-CommandStatement
@@ -1099,11 +1196,27 @@ function Find-WhileStatement
 
     [switch]$IncludeNestedClause
   )
-  $while = $ScriptBlock.Ast.FindAll(
+  $ast = $ScriptBlock.Ast.FindAll(
     {$args[0] -is [Management.Automation.Language.WhileStatementAst]},
     $IncludeNestedClause.ToBool()
   )
-  return $while
+  return $ast
+}
+
+function Find-TrapStatement
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [scriptblock]$ScriptBlock,
+
+    [switch]$IncludeNestedClause
+  )
+  $ast = $ScriptBlock.Ast.FindAll(
+    {$args[0] -is [Management.Automation.Language.TrapStatementAst]},
+    $IncludeNestedClause.ToBool()
+  )
+  return $ast
 }
 
 function Get-ScriptBlockToken
@@ -1130,24 +1243,5 @@ function Get-ScriptBlockToken
     $tokens = $tokens | Where-Object {$_.Kind -in $TokenKind}
   }
   return $tokens
-}
-
-function New-ClauseMetricsClassInstance
-{
-  [CmdletBinding()]
-  param(
-    [Parameter(Position=0)]
-    [ValidateSet(
-      'ClauseMetrics',
-      'IfClauseMetrics',
-      'TryCatchClauseMetrics',
-      'SwitchClauseMetrics',
-      'ForeachClauseMetrics',
-      'WhileClauseMetrics'
-    )]
-    [string]$TypeName = 'ClauseMetrics'
-  )
-  $classInstance = New-Object -TypeName $TypeName
-  return $classInstance
 }
 
