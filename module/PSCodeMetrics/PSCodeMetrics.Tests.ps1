@@ -958,82 +958,99 @@ InModuleScope -ModuleName PSCodeMetrics {
   }
 }
 
-#  $mockFunction = {
-#    [CmdletBinding()]
-#    Param(
-#      [bool]$Test = $true
-#    )
-#    <#
-#    Comment block
-#    #>
-#    Process
-#    {
-#      Try # Try
-#      {
-#        if ($Test -and $false) # if (+1) and operator (+1)
-#        {
-#          if ($null -like $false) # if (+1)
-#          {
-#            Get-Command -Name Get-Command `
-#              -ErrorAction Stop
-#          }
-#          else
-#          {
-#            # No elseif
-#          }
-#        }
-#        elseif ($Test -or $false) # elseif (+1) or operator (+1)
-#        {
-#          # elseif
-#        }
-#        elseif ($false) # elseif (+1)
-#        {
-#          Test-Path -Path Env:
-#          switch ($test) # Switch
-#          {
-#            $true {break} # Clause (+1)
-#            $false {break} # Clause (+1)
-#            default {break}
-#          }
-#        }
-#        else
-#        {
-#          while ($false) # While (+1)
-#          {
-#            Try
-#            {
-#              #Try
-#            }
-#            Catch # Catch (+1)
-#            {
-#              # CatchAll No Finally
-#            }
-#          }
-#          do
-#          {
-#            # Do / While
-#          } while ($false -xor 1) # xor operator (+1)
-#          foreach ($test in @(0, 1)) # Foreach (+1)
-#          {
-#            continue
-#          }
-#        }
-#      }
-#      Catch [Runtime.InteropServices.ExternalException] # Typed Catch (+1)
-#      {
-#        # Typed Catch
-#      }
-#      Catch [Exception] # Typed Catch (+1)
-#      {
-#        # Typed Catch
-#      }
-#      Catch # Catch (+1)
-#      {
-#        # Catch all
-#      }
-#      Finally
-#      {
-#        # Finally
-#      }
-#    }
-#  }
+$mockFunction = {
+  [CmdletBinding()]
+  Param(
+    [bool]$Test = $true
+  )
+  <#
+  Comment block
+  #>
+  Process
+  {
+    Try # Try
+    {
+      if ($Test -and $false) # if (+1) and operator (+1)
+      {
+        if ($null -like $false) # if (+1)
+        {
+          Get-Command -Name Get-Command `
+            -ErrorAction Stop
+        }
+        else
+        {
+          # No elseif
+        }
+      }
+      elseif ($Test -or $false) # elseif (+1) or operator (+1)
+      {
+        # elseif
+      }
+      elseif ($false) # elseif (+1)
+      {
+        Test-Path -Path Env:
+        switch ($test) # Switch
+        {
+          $true {break} # Clause (+1)
+          $false {break} # Clause (+1)
+          default {break}
+        }
+      }
+      else
+      {
+        while ($false) # While (+1)
+        {
+          Try
+          {
+            #Try
+          }
+          Catch # Catch (+1)
+          {
+            # CatchAll No Finally
+          }
+        }
+        do
+        {
+          # Do / While
+        } while ($false -xor 1) # xor operator (+1)
+        foreach ($test in @(0, 1)) # Foreach (+1)
+        {
+          continue
+        }
+        for ($i = 0; $i -lt 3; $i++) # For (+1)
+        {
+          continue
+        }
+        for ($i = 0;;$i++) # For no condition (+0)
+        {
+          break
+        }
+        for (;;) # For no initializer condition or iterator (+0)
+        {
+          break
+        }
+        for (($i = 0),($j = 0); $i -lt 3 -and $j -lt 3; $i++,$j++) # For (+1) -and (+1)
+        {
+          "`$i:$i"
+          "`$j:$j"
+        }
+      }
+    }
+    Catch [Runtime.InteropServices.ExternalException] # Typed Catch (+1)
+    {
+      # Typed Catch
+    }
+    Catch [Exception] # Typed Catch (+1)
+    {
+      # Typed Catch
+    }
+    Catch # Catch (+1)
+    {
+      # Catch all
+    }
+    Finally
+    {
+      # Finally
+    }
+  }
+}

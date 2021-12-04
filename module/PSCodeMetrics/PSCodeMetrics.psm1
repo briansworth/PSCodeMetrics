@@ -53,22 +53,22 @@ function Get-FunctionMetrics
     $nestedDepth = Get-MaxNestedDepth -ScriptBlock $ScriptBlock `
       -ErrorAction Stop
 
-    $commandStats = Get-ScriptBlockCommandMetrics -ScriptBlock $ScriptBlock `
+    $commandMetrics = Get-ScriptBlockCommandMetrics -ScriptBlock $ScriptBlock `
       -ErrorAction Stop
 
     $cCMetrics = Get-ScriptBlockCyclomaticComplexity -ScriptBlock $ScriptBlock `
       -ErrorAction Stop
 
-    $functionStats = [FunctionMetrics]@{
+    $functionMetric = [FunctionMetrics]@{
       'Name' = $FunctionName;
       'LineCount' = $lineCount;
       'Cc' = $cCMetrics.Cc;
       'CcMetrics' = $cCMetrics;
-      'CommandCount' = $commandStats.CommandCount;
+      'CommandCount' = $commandMetrics.CommandCount;
       'MaxNestedDepth' = $nestedDepth;
-      'CommandMetrics' = $commandStats;
+      'CommandMetrics' = $commandMetrics;
     }
-    return $functionStats
+    return $functionMetric
   }
   catch
   {
@@ -173,10 +173,10 @@ function Get-ScriptBlockCommandMetrics
   $commands = Find-CommandStatement -ScriptBlock $ScriptBlock `
     -IncludeNestedClause
 
-  $stats = New-Object -TypeName TotalCommandMetrics
+  $metrics = New-Object -TypeName TotalCommandMetrics
   if ($null -eq $commands)
   {
-    return $stats
+    return $metrics
   }
 
   $commandCount = $commands | Measure-Object
@@ -196,11 +196,11 @@ function Get-ScriptBlockCommandMetrics
   }
   $uniqueCount = $commandNames | Select-Object -Unique | Measure-Object
 
-  $stats.CommandCount = $commandCount.Count
-  $stats.UniqueCommandCount = $uniqueCount.Count
-  $stats.CommandNames = $commandNames
+  $metrics.CommandCount = $commandCount.Count
+  $metrics.UniqueCommandCount = $uniqueCount.Count
+  $metrics.CommandNames = $commandNames
 
-  return $stats
+  return $metrics
 }
 
 function Get-ScriptBlockCyclomaticComplexity
@@ -210,34 +210,38 @@ function Get-ScriptBlockCyclomaticComplexity
     [Parameter(Position=0, Mandatory=$true)]
     [scriptblock]$ScriptBlock
   )
-    $ifStats = Get-ScriptBlockIfMetrics -ScriptBlock $ScriptBlock `
+    $ifMetric = Get-ScriptBlockIfMetrics -ScriptBlock $ScriptBlock `
       -ErrorAction Stop
-    $foreachStats = Get-ScriptBlockForeachMetrics -ScriptBlock $ScriptBlock `
+    $foreachMetric = Get-ScriptBlockForeachMetrics -ScriptBlock $ScriptBlock `
       -ErrorAction Stop
-    $tryStats = Get-ScriptBlockTryCatchMetrics -ScriptBlock $ScriptBlock `
+    $forMetric = Get-ScriptBlockForMetrics -ScriptBlock $ScriptBlock `
       -ErrorAction Stop
-    $switchStats = Get-ScriptBlockSwitchMetrics -ScriptBlock $ScriptBlock `
+    $tryMetric = Get-ScriptBlockTryCatchMetrics -ScriptBlock $ScriptBlock `
       -ErrorAction Stop
-    $whileStats = Get-ScriptBlockWhileMetrics -ScriptBlock $ScriptBlock `
+    $switchMetric = Get-ScriptBlockSwitchMetrics -ScriptBlock $ScriptBlock `
       -ErrorAction Stop
-    $operatorStats = Get-BoolOperatorMetrics -ScriptBlock $ScriptBlock `
+    $whileMetric = Get-ScriptBlockWhileMetrics -ScriptBlock $ScriptBlock `
+      -ErrorAction Stop
+    $operatorMetric = Get-BoolOperatorMetrics -ScriptBlock $ScriptBlock `
       -ErrorAction Stop
 
-    $totalCc = $ifStats.Cc + `
-      $tryStats.Cc + `
-      $switchStats.Cc + `
-      $whileStats.Cc + `
-      $foreachStats.Cc + `
-      $operatorStats.Cc + 1 # Always at least 1 code path
+    $totalCc = $ifMetric.Cc + `
+      $foreachMetric.Cc + `
+      $forMetric.Cc + `
+      $tryMetric.Cc + `
+      $switchMetric.Cc + `
+      $whileMetric.Cc + `
+      $operatorMetric.Cc + 1 # Always at least 1 code path
 
     $cCMetrics = [CyclomaticComplexityMetrics]@{
       'Cc' = $totalCc;
-      'IfElse' = $ifStats;
-      'TryCatch' = $tryStats;
-      'Switch' = $switchStats;
-      'While' = $whileStats;
-      'Foreach' = $foreachStats;
-      'BoolOperator' = $operatorStats;
+      'IfElse' = $ifMetric;
+      'Foreach' = $foreachMetric;
+      'For' = $forMetric;
+      'TryCatch' = $tryMetric;
+      'Switch' = $switchMetric;
+      'While' = $whileMetric;
+      'BoolOperator' = $operatorMetric;
     }
     return $cCMetrics
 }
@@ -247,10 +251,11 @@ class CyclomaticComplexityMetrics
 {
   [int]$Cc
   [TotalIfClauseMetrics]$IfElse
+  [TotalForeachClauseMetrics]$Foreach
+  [TotalForClauseMetrics]$For
   [TotalTryClauseMetrics]$TryCatch
   [TotalSwitchClauseMetrics]$Switch
   [TotalWhileClauseMetrics]$While
-  [TotalForeachClauseMetrics]$Foreach
   [BoolOperatorMetrics]$BoolOperator
 }
 
@@ -261,25 +266,25 @@ function Get-ScriptBlockIfMetrics
     [Parameter(Position=0, Mandatory=$true)]
     [scriptblock]$ScriptBlock
   )
-  $statsTypeName = 'IfClauseMetrics'
+  $typeName = 'IfClauseMetrics'
   $ifClause = Find-IfStatement -ScriptBlock $ScriptBlock `
     -IncludeNestedClause
 
   if ($null -eq $ifClause)
   {
-    $stats = New-Object -TypeName $statsTypeName
+    $metrics = New-Object -TypeName $typeName
   }
   else
   {
-    $stats = New-Object -TypeName "Collections.Generic.List[$statsTypeName]"
+    $metrics = New-Object -TypeName "Collections.Generic.List[$typeName]"
     foreach ($clause in $ifClause)
     {
-      $statistics = Get-IfClauseMetrics -Clause $clause
-      [void]$stats.Add($statistics)
+      $metric = Get-IfClauseMetrics -Clause $clause
+      [void]$metrics.Add($metric)
     }
   }
 
-  $totalMetrics = Measure-IfStatementMetrics -IfClauseMetrics $stats
+  $totalMetrics = Measure-IfStatementMetrics -IfClauseMetrics $metrics
   return $totalMetrics
 }
 
@@ -290,25 +295,54 @@ function Get-ScriptBlockForeachMetrics
     [Parameter(Position=0, Mandatory=$true)]
     [scriptblock]$ScriptBlock
   )
-  $statsTypeName = 'ForeachClauseMetrics'
+  $typeName = 'ForeachClauseMetrics'
   $foreachClause = Find-ForeachStatement -ScriptBlock $ScriptBlock `
     -IncludeNestedClause
 
   if ($null -eq $foreachClause)
   {
-    $stats = New-Object -TypeName $statsTypeName
+    $metrics = New-Object -TypeName $typeName
   }
   else
   {
-    $stats = New-Object -TypeName "Collections.Generic.List[$statsTypeName]"
+    $metrics = New-Object -TypeName "Collections.Generic.List[$typeName]"
     foreach ($clause in $foreachClause)
     {
-      $statistics = Get-ForeachClauseMetrics -Clause $clause
-      [void]$stats.Add($statistics)
+      $metric = Get-ForeachClauseMetrics -Clause $clause
+      [void]$metrics.Add($metric)
     }
   }
 
-  $totalMetrics = Measure-ForeachClauseMetrics -ForeachClauseMetrics $stats
+  $totalMetrics = Measure-ForeachClauseMetrics -ForeachClauseMetrics $metrics
+  return $totalMetrics
+}
+
+function Get-ScriptBlockForMetrics
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [scriptblock]$ScriptBlock
+  )
+  $typeName = 'ForClauseMetrics'
+  $clauses = Find-ForStatement -ScriptBlock $ScriptBlock `
+    -IncludeNestedClause
+
+  if ($null -eq $clauses)
+  {
+    $metrics = New-Object -TypeName $typeName
+  }
+  else
+  {
+    $metrics = New-Object -TypeName "Collections.Generic.List[$typeName]"
+    foreach ($clause in $clauses)
+    {
+      $metric = Get-ForClauseMetrics -Clause $clause
+      [void]$metrics.Add($metric)
+    }
+  }
+
+  $totalMetrics = Measure-ForClauseMetrics -ForClauseMetrics $metrics
   return $totalMetrics
 }
 
@@ -319,25 +353,25 @@ function Get-ScriptBlockTryCatchMetrics
     [Parameter(Position=0, Mandatory=$true)]
     [scriptblock]$ScriptBlock
   )
-  $statsTypeName = 'TryClauseMetrics'
+  $typeName = 'TryClauseMetrics'
   $tryClause = Find-TryStatement -ScriptBlock $ScriptBlock `
     -IncludeNestedClause
 
   if ($null -eq $tryClause)
   {
-    $stats = New-Object -TypeName $statsTypeName
+    $metrics = New-Object -TypeName $typeName
   }
   else
   {
-    $stats = New-Object -TypeName "Collections.Generic.List[$statsTypeName]"
+    $metrics = New-Object -TypeName "Collections.Generic.List[$typeName]"
     foreach ($clause in $tryClause)
     {
-      $statistics = Get-TryCatchClauseMetrics -Clause $clause
-      [void]$stats.Add($statistics)
+      $metric = Get-TryCatchClauseMetrics -Clause $clause
+      [void]$metrics.Add($metric)
     }
   }
 
-  $totalMetrics = Measure-TryCatchClauseMetrics -TryClauseMetrics $stats
+  $totalMetrics = Measure-TryCatchClauseMetrics -TryClauseMetrics $metrics
   return $totalMetrics
 }
 
@@ -348,25 +382,25 @@ function Get-ScriptBlockSwitchMetrics
     [Parameter(Position=0, Mandatory=$true)]
     [scriptblock]$ScriptBlock
   )
-  $statsTypeName = 'SwitchClauseMetrics'
+  $typeName = 'SwitchClauseMetrics'
   $switchClause = Find-SwitchStatement -ScriptBlock $ScriptBlock `
     -IncludeNestedClause
 
   if ($null -eq $switchClause)
   {
-    $stats = New-Object -TypeName $statsTypeName
+    $metrics = New-Object -TypeName $typeName
   }
   else
   {
-    $stats = New-Object -TypeName "Collections.Generic.List[$statsTypeName]"
+    $metrics = New-Object -TypeName "Collections.Generic.List[$typeName]"
     foreach ($clause in $switchClause)
     {
-      $statistics = Get-SwitchClauseMetrics -Clause $clause
-      [void]$stats.Add($statistics)
+      $metric = Get-SwitchClauseMetrics -Clause $clause
+      [void]$metrics.Add($metric)
     }
   }
 
-  $totalMetrics = Measure-SwitchClauseMetrics -SwitchClauseMetrics $stats
+  $totalMetrics = Measure-SwitchClauseMetrics -SwitchClauseMetrics $metrics
   return $totalMetrics
 }
 
@@ -377,25 +411,25 @@ function Get-ScriptBlockWhileMetrics
     [Parameter(Position=0, Mandatory=$true)]
     [scriptblock]$ScriptBlock
   )
-  $statsTypeName = 'WhileClauseMetrics'
+  $typeName = 'WhileClauseMetrics'
   $whileClause = Find-WhileStatement -ScriptBlock $ScriptBlock `
     -IncludeNestedClause
 
   if ($null -eq $whileClause)
   {
-    $stats = New-Object -TypeName $statsTypeName
+    $metrics = New-Object -TypeName $typeName
   }
   else
   {
-    $stats = New-Object -TypeName "Collections.Generic.List[$statsTypeName]"
+    $metrics = New-Object -TypeName "Collections.Generic.List[$typeName]"
     foreach ($clause in $whileClause)
     {
-      $statistics = Get-WhileClauseMetrics -Clause $clause
-      [void]$stats.Add($statistics)
+      $metric = Get-WhileClauseMetrics -Clause $clause
+      [void]$metrics.Add($metric)
     }
   }
 
-  $totalMetrics = Measure-WhileClauseMetrics -WhileClauseMetrics $stats
+  $totalMetrics = Measure-WhileClauseMetrics -WhileClauseMetrics $metrics
   return $totalMetrics
 }
 
@@ -431,14 +465,14 @@ function Get-BoolOperatorMetrics
     }
   }
 
-  $stats = [BoolOperatorMetrics]@{
+  $metrics = [BoolOperatorMetrics]@{
     'Cc' = $operatorCount;
     'AndOperators' = $andCount;
     'OrOperators' = $orCount;
     'XOrOperators' = $xorCount;
   }
 
-  return $stats
+  return $metrics
 }
 
 
@@ -477,14 +511,14 @@ function Measure-IfStatementMetrics
       $longestStatement = $lineCount
     }
   }
-  $totalStats = [TotalIfClauseMetrics]@{
+  $totalMetrics = [TotalIfClauseMetrics]@{
     'Cc' = $codePaths.Sum;
     'IfStatementTotal' = $ifs.Sum;
     'ElseIfStatementTotal' = $elifs.Sum;
     'ElseStatementTotal' = $elses.Sum;
     'LargestStatementLineCount' = $longestStatement;
   }
-  return $totalStats
+  return $totalMetrics
 }
 
 function Measure-ForeachClauseMetrics
@@ -512,14 +546,52 @@ function Measure-ForeachClauseMetrics
     $conditions.Add($clause.Condition)
   }
 
-  $totalStats = [TotalForeachClauseMetrics]@{
+  $totalMetrics = [TotalForeachClauseMetrics]@{
     'Cc' = $codePaths.Sum;
     'LargestStatementLineCount' = $longestStatement;
     'ForeachStatementTotal' = $foreachs.Count;
     'VariableNames' = $variableNames;
     'Conditions' = $conditions;
   }
-  return $totalStats
+  return $totalMetrics
+}
+
+function Measure-ForClauseMetrics
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [ForClauseMetrics[]]$ForClauseMetrics
+  )
+  $longestStatement = 0
+
+  $codePaths = $ForClauseMetrics | Measure-Object -Property Cc -Sum
+  $fors = $ForClauseMetrics | Measure-Object
+  $initializers = New-Object -TypeName Collections.Generic.List[string]
+  $iterators = New-Object -TypeName Collections.Generic.List[string]
+  $conditions = New-Object -TypeName Collections.Generic.List[string]
+
+  foreach ($clause in $ForClauseMetrics)
+  {
+    $lineCount = $clause.GetLineCount()
+    if ($lineCount -gt $longestStatement)
+    {
+      $longestStatement = $lineCount
+    }
+    $initializers.Add($clause.Initializer)
+    $iterators.Add($clause.Iterator)
+    $conditions.Add($clause.Condition)
+  }
+
+  $totalMetrics = [TotalForClauseMetrics]@{
+    'Cc' = $codePaths.Sum;
+    'LargestStatementLineCount' = $longestStatement;
+    'ForStatementTotal' = $fors.Count;
+    'Initializers' = $initializers;
+    'Iterators' = $iterators;
+    'Conditions' = $conditions;
+  }
+  return $totalMetrics
 }
 
 function Measure-TryCatchClauseMetrics
@@ -551,7 +623,7 @@ function Measure-TryCatchClauseMetrics
     }
   }
 
-  $totalStats = [TotalTryClauseMetrics]@{
+  $totalMetrics = [TotalTryClauseMetrics]@{
     'Cc' = $codePaths.Sum;
     'TryStatementTotal' = $trys.Count;
     'CatchStatementTotal' = $catches.Sum;
@@ -561,7 +633,7 @@ function Measure-TryCatchClauseMetrics
     'LargestStatementLineCount' = $longestStatement;
   }
 
-  return $totalStats
+  return $totalMetrics
 }
 
 function Measure-SwitchClauseMetrics
@@ -591,14 +663,14 @@ function Measure-SwitchClauseMetrics
     }
   }
 
-  $totalStats = [TotalSwitchClauseMetrics]@{
+  $totalMetrics = [TotalSwitchClauseMetrics]@{
     'Cc' = $codePaths.Sum;
     'SwitchStatementTotal' = $switches.Count;
     'SwitchClauseTotal' = $switchClauses.Sum;
     'DefaultClauseTotal' = $totalDefaultClauseCount;
     'LargestStatementLineCount' = $longestStatement;
   }
-  return $totalStats
+  return $totalMetrics
 }
 
 function Measure-WhileClauseMetrics
@@ -622,12 +694,12 @@ function Measure-WhileClauseMetrics
     }
   }
 
-  $totalStats = [TotalWhileClauseMetrics]@{
+  $totalMetrics = [TotalWhileClauseMetrics]@{
     'Cc' = $codePaths.Sum;
     'WhileStatementTotal' = $whiles.Count;
     'LargestStatementLineCount' = $longestStatement;
   }
-  return $totalStats
+  return $totalMetrics
 }
 
 
@@ -664,6 +736,23 @@ class TotalIfClauseMetrics: TotalClauseMetrics
 }
 
 
+class TotalForeachClauseMetrics: TotalClauseMetrics
+{
+  [int]$ForeachStatementTotal
+  [string[]]$VariableNames
+  [string[]]$Conditions
+}
+
+
+class TotalForClauseMetrics: TotalClauseMetrics
+{
+  [int]$ForStatementTotal
+  [string[]]$Initializers
+  [string[]]$Iterators
+  [string[]]$Conditions
+}
+
+
 class TotalTryClauseMetrics: TotalClauseMetrics
 {
   [int]$TryStatementTotal
@@ -687,14 +776,6 @@ class TotalWhileClauseMetrics: TotalClauseMetrics
   [int]$WhileStatementTotal
 }
 
-
-class TotalForeachClauseMetrics: TotalClauseMetrics
-{
-  [int]$ForeachStatementTotal
-  [string[]]$VariableNames
-  [string[]]$Conditions
-}
-
 function Get-IfClauseMetrics
 {
   [CmdletBinding()]
@@ -704,7 +785,7 @@ function Get-IfClauseMetrics
   )
   $clauseCount = $Clause.Clauses.Count
 
-  $ifStats = [IfClauseMetrics]@{
+  $ifMetrics = [IfClauseMetrics]@{
     'IfStatements' = 1;
     'ElseIfStatements' = $clauseCount - 1;
     'Cc' = $clauseCount;
@@ -713,14 +794,14 @@ function Get-IfClauseMetrics
 
   if ($null -eq $Clause.ElseClause)
   {
-    $ifStats.EndLineNumber = $Clause[-1].Extent.EndLineNumber
+    $ifMetrics.EndLineNumber = $Clause[-1].Extent.EndLineNumber
   }
   else
   {
-    $ifStats.ElseStatements = 1
-    $ifStats.EndLineNumber = $Clause.ElseClause.Extent.EndLineNumber
+    $ifMetrics.ElseStatements = 1
+    $ifMetrics.EndLineNumber = $Clause.ElseClause.Extent.EndLineNumber
   }
-  return $ifStats
+  return $ifMetrics
 }
 
 function Get-ForeachClauseMetrics
@@ -730,7 +811,7 @@ function Get-ForeachClauseMetrics
     [Parameter(Position=0, Mandatory=$true)]
     [Management.Automation.Language.ForeachStatementAst]$Clause
   )
-  $foreachStats = [ForeachClauseMetrics]@{
+  $metrics = [ForeachClauseMetrics]@{
     'ForeachStatements' = 1;
     'Cc' = 1;
     'VariableName' = $Clause.Variable.Extent.Text;
@@ -738,7 +819,45 @@ function Get-ForeachClauseMetrics
     'StartLineNumber' = $Clause.Extent.StartLineNumber;
     'EndLineNumber' = $Clause.Extent.EndLineNumber;
   }
-  return $foreachStats
+  return $metrics
+}
+
+function Get-ForClauseMetrics
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [Management.Automation.Language.ForStatementAst]$Clause
+  )
+  $cc = 0
+  $condition = [string]::Empty
+  $initializer = [string]::Empty
+  $iterator = [string]::Empty
+
+  if ($null -ne $Clause.Condition)
+  {
+    $cc = 1
+    $condition = $Clause.Condition.Extent.Text
+  }
+  if ($null -ne $Clause.Iterator)
+  {
+    $iterator = $Clause.Iterator.Extent.Text
+  }
+  if ($null -ne $Clause.Initializer)
+  {
+    $initializer = $Clause.Initializer.Extent.Text
+  }
+
+  $metrics = [ForClauseMetrics]@{
+    'ForStatements' = 1;
+    'Cc' = $cc;
+    'Initializer' = $initializer;
+    'Iterator' = $iterator;
+    'Condition' = $condition;
+    'StartLineNumber' = $Clause.Extent.StartLineNumber;
+    'EndLineNumber' = $Clause.Extent.EndLineNumber;
+  }
+  return $metrics
 }
 
 function Get-TryCatchClauseMetrics
@@ -751,7 +870,7 @@ function Get-TryCatchClauseMetrics
   $catchAlls = $Clause.CatchClauses | Where-Object {$_.IsCatchAll} | Measure-Object
   $catchCount = $Clause.CatchClauses.Count
 
-  $catchStats = [TryClauseMetrics]@{
+  $metrics = [TryClauseMetrics]@{
     'CatchStatements' = $catchCount;
     'Cc' = $catchCount;
     'StartLineNumber' = $Clause.Extent.StartLineNumber;
@@ -763,9 +882,9 @@ function Get-TryCatchClauseMetrics
 
   if ($null -ne $Clause.Finally)
   {
-    $catchStats.HasFinally = $true
+    $metrics.HasFinally = $true
   }
-  return $catchStats
+  return $metrics
 }
 
 function Get-SwitchClauseMetrics
@@ -777,7 +896,7 @@ function Get-SwitchClauseMetrics
   )
   $switchClauses = $Clause.Clauses | Measure-Object
 
-  $switchStats = [SwitchClauseMetrics]@{
+  $metrics = [SwitchClauseMetrics]@{
     'SwitchStatements' = 1;
     'StartLineNumber' = $Clause.Extent.StartLineNumber;
     'EndLineNumber' = $Clause.Extent.EndLineNumber;
@@ -788,9 +907,9 @@ function Get-SwitchClauseMetrics
 
   if ($null -ne $Clause.Default)
   {
-    $switchStats.HasDefault = $true
+    $metrics.HasDefault = $true
   }
-  return $switchStats
+  return $metrics
 }
 
 function Get-WhileClauseMetrics
@@ -800,13 +919,13 @@ function Get-WhileClauseMetrics
     [Parameter(Position=0, Mandatory=$true)]
     [Management.Automation.Language.WhileStatementAst]$Clause
   )
-  $whileStats = [WhileClauseMetrics]@{
+  $metrics = [WhileClauseMetrics]@{
     'WhileStatements' = 1;
     'Cc' = 1;
     'StartLineNumber' = $Clause.Extent.StartLineNumber;
     'EndLineNumber' = $Clause.Extent.EndLineNumber;
   }
-  return $whileStats
+  return $metrics
 }
 
 
@@ -844,6 +963,15 @@ class ForeachClauseMetrics: ClauseMetrics
 }
 
 
+class ForClauseMetrics: ClauseMetrics
+{
+  [int]$ForStatements
+  [string]$Iterator
+  [string]$Initializer
+  [string]$Condition
+}
+
+
 class TryClauseMetrics: ClauseMetrics
 {
   [int]$CatchStatements
@@ -875,11 +1003,11 @@ function Find-CommandStatement
 
     [switch]$IncludeNestedClause
   )
-  $commands = $ScriptBlock.Ast.FindAll(
+  $ast = $ScriptBlock.Ast.FindAll(
     {$args[0] -is [Management.Automation.Language.CommandAst]},
     $IncludeNestedClause.ToBool()
   )
-  return $commands
+  return $ast
 }
 
 function Find-IfStatement
@@ -891,11 +1019,11 @@ function Find-IfStatement
 
     [switch]$IncludeNestedClause
   )
-  $ifClause = $ScriptBlock.Ast.FindAll(
+  $ast = $ScriptBlock.Ast.FindAll(
     {$args[0] -is [Management.Automation.Language.IfStatementAst]},
     $IncludeNestedClause.ToBool()
   )
-  return $ifClause
+  return $ast
 }
 
 function Find-ForeachStatement
@@ -907,11 +1035,27 @@ function Find-ForeachStatement
 
     [switch]$IncludeNestedClause
   )
-  $switchStatement = $ScriptBlock.Ast.FindAll(
+  $ast = $ScriptBlock.Ast.FindAll(
     {$args[0] -is [Management.Automation.Language.ForeachStatementAst]},
     $IncludeNestedClause.ToBool()
   )
-  return $switchStatement
+  return $ast
+}
+
+function Find-ForStatement
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [scriptblock]$ScriptBlock,
+
+    [switch]$IncludeNestedClause
+  )
+  $ast = $ScriptBlock.Ast.FindAll(
+    {$args[0] -is [Management.Automation.Language.ForStatementAst]},
+    $IncludeNestedClause.ToBool()
+  )
+  return $ast
 }
 
 function Find-TryStatement
@@ -923,11 +1067,11 @@ function Find-TryStatement
 
     [switch]$IncludeNestedClause
   )
-  $catch = $ScriptBlock.Ast.FindAll(
+  $ast = $ScriptBlock.Ast.FindAll(
     {$args[0] -is [Management.Automation.Language.TryStatementAst]},
     $IncludeNestedClause.ToBool()
   )
-  return $catch
+  return $ast
 }
 
 function Find-SwitchStatement
@@ -939,11 +1083,11 @@ function Find-SwitchStatement
 
     [switch]$IncludeNestedClause
   )
-  $switchStatement = $ScriptBlock.Ast.FindAll(
+  $ast = $ScriptBlock.Ast.FindAll(
     {$args[0] -is [Management.Automation.Language.SwitchStatementAst]},
     $IncludeNestedClause.ToBool()
   )
-  return $switchStatement
+  return $ast
 }
 
 function Find-WhileStatement
