@@ -18,18 +18,23 @@
                     </TableColumnHeader>
                     <TableColumnHeader>
                         <Label>MaxNestedDepth</Label>
-                        <Width>15</Width>
+                        <Width>14</Width>
                         <Alignment>Right</Alignment>
                     </TableColumnHeader>
                     <TableColumnHeader>
-                        <Label>LineCount</Label>
-                        <Width>6</Width>
+                        <Label>Lloc</Label>
+                        <Width>5</Width>
                         <Alignment>Right</Alignment>
                     </TableColumnHeader>
                     <TableColumnHeader>
                         <Label>CommandCount</Label>
                         <Width>12</Width>
                         <Alignment>Right</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>CcMetrics</Label>
+                        <Width>12</Width>
+                        <Alignment>Left</Alignment>
                     </TableColumnHeader>
                 </TableHeaders>
                 <TableRowEntries>
@@ -45,10 +50,13 @@
                                 <PropertyName>MaxNestedDepth</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>LineCount</PropertyName>
+                                <PropertyName>Lloc</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
                                 <PropertyName>CommandCount</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>CcMetrics</PropertyName>
                             </TableColumnItem>
                         </TableColumnItems>
                     </TableRowEntry>

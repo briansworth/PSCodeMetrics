@@ -47,23 +47,17 @@ function Get-FunctionMetrics
       $FunctionName = ''
     }
 
-    $lineCount = $ScriptBlock.Ast.Extent.EndLineNumber -`
-      $ScriptBlock.Ast.Extent.StartLineNumber + 1
-
-    $nestedDepth = Get-MaxNestedDepth -ScriptBlock $ScriptBlock `
-      -ErrorAction Stop
-
-    $commandMetrics = Get-ScriptBlockCommandMetrics -ScriptBlock $ScriptBlock `
-      -ErrorAction Stop
-
-    $cCMetrics = Get-ScriptBlockCyclomaticComplexity -ScriptBlock $ScriptBlock `
-      -ErrorAction Stop
+    $nestedDepth = Get-MaxNestedDepth -ScriptBlock $ScriptBlock
+    $locMetrics = Get-ScriptBlockLocMetrics -ScriptBlock $ScriptBlock
+    $commandMetrics = Get-ScriptBlockCommandMetrics -ScriptBlock $ScriptBlock
+    $cCMetrics = Get-ScriptBlockCyclomaticComplexity -ScriptBlock $ScriptBlock
 
     $functionMetric = [FunctionMetrics]@{
       'Name' = $FunctionName;
-      'LineCount' = $lineCount;
       'Cc' = $cCMetrics.Cc;
+      'Lloc' = $locMetrics.Lloc;
       'CcMetrics' = $cCMetrics;
+      'LocMetrics' = $locMetrics;
       'CommandCount' = $commandMetrics.CommandCount;
       'MaxNestedDepth' = $nestedDepth;
       'CommandMetrics' = $commandMetrics;
@@ -120,9 +114,10 @@ class FunctionMetrics
 {
   [string]$Name
   [int]$Cc
-  [CyclomaticComplexityMetrics]$CcMetrics
+  [int]$Lloc
   [int]$MaxNestedDepth
-  [int]$LineCount
+  [CyclomaticComplexityMetrics]$CcMetrics
+  [LocMetrics]$LocMetrics
   [int]$CommandCount
   [TotalCommandMetrics]$CommandMetrics
 }
@@ -156,6 +151,44 @@ function Get-MaxNestedDepth
     }
   }
   return $max
+}
+
+function Get-ScriptBlockLocMetrics
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [scriptblock]$ScriptBlock
+  )
+
+  $sloc = $ScriptBlock.Ast.Extent.EndLineNumber -`
+    $ScriptBlock.Ast.Extent.StartLineNumber + 1
+  $comments = Get-ScriptBlockCommentMetrics -ScriptBlock $ScriptBlock
+  $emptyLines = Get-ScriptBlockEmptyLineMetrics -ScriptBlock $ScriptBlock
+
+  $lloc = $sloc - $comments.CommentLineCount - $emptyLines.TotalEmptyLines
+
+  $metrics = [LocMetrics]@{
+    'Lloc' = $lloc;
+    'Sloc' = $sloc;
+    'EmptyLines' = $emptyLines;
+    'Comments' = $comments;
+  }
+  return $metrics
+}
+
+
+class LocMetrics
+{
+  [int]$Lloc
+  [int]$Sloc
+  [TotalEmptyLineMetrics]$EmptyLines
+  [TotalCommentMetrics]$Comments
+  
+  [string] ToString()
+  {
+    return "{Sloc: $($this.Sloc)..}"
+  }
 }
 
 function Get-ScriptBlockCommandMetrics
@@ -257,6 +290,11 @@ class CyclomaticComplexityMetrics
   [TotalWhileClauseMetrics]$While
   [TotalTrapClauseMetrics]$Trap
   [BoolOperatorMetrics]$BoolOperator
+
+  [string] ToString()
+  {
+    return "{IfElse: $($this.IfElse.Cc)..}"
+  }
 }
 
 function Get-ScriptBlockIfMetrics
@@ -459,6 +497,30 @@ function Get-ScriptBlockTrapMetrics
   }
 
   $totalMetrics = Measure-TrapClauseMetrics -TrapClauseMetrics $metrics
+  return $totalMetrics
+}
+
+function Get-ScriptBlockCommentMetrics
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [scriptblock]$ScriptBlock
+  )
+  $details = Get-CommentDetailMetrics -ScriptBlock $ScriptBlock
+  $totalMetrics = Measure-CommentMetrics -CommentDetails $details
+  return $totalMetrics
+}
+
+function Get-ScriptBlockEmptyLineMetrics
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [scriptblock]$ScriptBlock
+  )
+  $emptyLines = Get-EmptyLineMetric -ScriptBlock $ScriptBlock
+  $totalMetrics = Measure-EmptyLineMetrics -EmptyLineMetrics $emptyLines
   return $totalMetrics
 }
 
@@ -763,6 +825,62 @@ function Measure-TrapClauseMetrics
   return $totalMetrics
 }
 
+function Measure-CommentMetrics
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [AllowEmptyCollection()]
+    [CommentDetails[]]$CommentDetails
+  )
+  $metrics = [TotalCommentMetrics]@{
+    'TotalComments' = ($CommentDetails | Measure-Object).Count;
+    'Details' = $CommentDetails;
+  }
+  $lineCount = 0
+
+  foreach ($comment in $CommentDetails)
+  {
+    if ($comment.Type -ne [CommentType]::Appended)
+    {
+      $lineCount += $comment.Context.Length
+    }
+  }
+  $metrics.CommentLineCount = $lineCount
+  return $metrics
+}
+
+function Measure-EmptyLineMetrics
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [AllowEmptyCollection()]
+    [EmptyLineMetrics[]]$EmptyLineMetrics
+  )
+  $count = ($EmptyLineMetrics | Measure-Object).Count
+  $metrics = [TotalEmptyLineMetrics]@{
+    'TotalEmptyLines' = $count;
+    'EmptyLines' = $EmptyLineMetrics;
+  }
+  return $metrics
+}
+
+
+class TotalEmptyLineMetrics
+{
+  [int]$TotalEmptyLines
+  [EmptyLineMetrics[]]$EmptyLines
+}
+
+
+class TotalCommentMetrics
+{
+  [int]$TotalComments
+  [int]$CommentLineCount
+  [CommentDetails[]]$Details
+}
+
 
 class TotalCommandMetrics
 {
@@ -1018,6 +1136,104 @@ function Get-TrapClauseMetrics
   return $metrics
 }
 
+function Get-CommentDetailMetrics
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [scriptblock]$ScriptBlock
+  )
+  $tokenComments = Get-ScriptBlockToken -ScriptBlock $ScriptBlock -TokenKind Comment
+  $comments = New-Object -TypeName Collections.Generic.List[CommentDetails]
+  foreach ($comment in $tokenComments)
+  {
+    $detail = Get-CommentDetails -ScriptBlock $ScriptBlock -CommentToken $comment
+    $comments.Add($detail)
+  }
+  return ,$comments
+}
+
+function Get-EmptyLineMetric
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [scriptblock]$ScriptBlock
+  )
+  $endLine = $ScriptBlock.Ast.Extent.EndLineNumber - 1
+  $startLine = $ScriptBlock.Ast.Extent.StartLineNumber - 1
+  $range = [Range]::new($startLine, $endLine)
+
+  $context = Get-ScriptBlockContext -ScriptBlock $ScriptBlock -LineRange $range
+  $metrics = New-Object -TypeName Collections.Generic.List[EmptyLineMetrics]
+  for ($i = 0; $i -lt $context.Context.Length; $i++)
+  {
+    $line = $context.Context[$i]
+    $isEmpty = Test-IsEmptyLine -Text $context.Context[$i]
+    if ($isEmpty.Result)
+    {
+      $metric = [EmptyLineMetrics]@{
+        'LineNumber' = $i + 1 + $context.Offset;
+        'HasWhitespace' = $isEmpty.HasWhitespace;
+      }
+      $metrics.Add($metric)
+    }
+  }
+  return ,$metrics
+}
+
+function Test-IsEmptyLine
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [AllowEmptyString()]
+    [string]$Text
+  )
+  $hasWhitespace = $false
+  if ($Text -eq [string]::Empty)
+  {
+    $isEmpty = $true
+  }
+  elseif ($Text -match '^\s+$')
+  {
+    $isEmpty = $true
+    $hasWhitespace = $true
+  }
+  else
+  {
+    $isEmpty = $false
+  }
+  $output = New-Object -TypeName PSObject -Property @{
+    'Result' = $isEmpty;
+    'HasWhitespace' = $hasWhitespace;
+  }
+  return $output
+}
+
+
+class CommentDetails
+{
+  [CommentType]$Type
+  [Management.Automation.Language.Token]$Token
+  [string[]]$Context
+}
+
+
+enum CommentType
+{
+  Default
+  Appended
+  Block
+}
+
+
+class EmptyLineMetrics
+{
+  [int]$LineNumber
+  [bool]$HasWhitespace
+}
+
 
 class ClauseMetrics
 {
@@ -1089,6 +1305,76 @@ class TrapClauseMetrics: ClauseMetrics
 {
   [int]$TrapStatements
   [string]$Type
+}
+
+function Get-CommentDetails
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [scriptblock]$ScriptBlock,
+
+    [Parameter(Position=1, Mandatory=$true)]
+    [Management.Automation.Language.Token]$CommentToken
+  )
+  $startIndex = $CommentToken.Extent.StartLineNumber - 1
+  $endIndex = $CommentToken.Extent.EndLineNumber - 2
+  $range = [Range]::new($startIndex, $endIndex)
+
+  $context = Get-ScriptBlockContext -ScriptBlock $ScriptBlock -LineRange $range
+  $commentType = Resolve-CommentType -Context $context
+  $details = [CommentDetails]@{
+    'Type' = $commentType;
+    'Token' = $CommentToken;
+    'Context' = $context.Context;
+  }
+  return $details
+}
+
+function Get-ScriptBlockContext
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [scriptblock]$ScriptBlock,
+
+    [Parameter(Position=1, Mandatory=$true)]
+    [range]$LineRange
+  )
+  $offset = $LineRange.Start.Value
+  $start = $LineRange.Start.Value - $offset
+  $end = $LineRange.End.Value - $offset
+
+  $scriptLines = $ScriptBlock.Ast.Extent.Text.Split("`n")
+  $context = $scriptLines["$start".."$end"]
+  $output = New-Object -TypeName PSObject -Property @{
+    'Context' = $context;
+    'Offset' = $offset;
+  }
+  return $output
+}
+
+function Resolve-CommentType
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [AllowEmptyString()]
+    [string[]]$Context
+  )
+  if ($Context.Count -gt 1)
+  {
+    $type = [CommentType]::Block
+  }
+  elseif ($Context -notmatch '^\s*#.*')
+  {
+    $type = [CommentType]::Appended
+  }
+  else
+  {
+    $type = [CommentType]::Default
+  }
+  return $type
 }
 
 function Find-CommandStatement

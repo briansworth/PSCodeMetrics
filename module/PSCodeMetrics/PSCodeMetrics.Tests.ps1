@@ -41,7 +41,9 @@ BeforeAll {
           switch ($test) # Switch
           {
             $true {break} # Clause (+1)
+ 
             $false {break} # Clause (+1)
+
             default {break}
           }
         }
@@ -125,6 +127,11 @@ Describe Get-PSCMFunctionMetrics {
 
     {Get-PSCMFunctionMetrics -FunctionName $funcName -ErrorAction Stop} |
       Should -Throw -ExceptionType ([ArgumentException]) -ExpectedMessage $expectedMsg
+  }
+
+  It 'Successfully handles an empty scriptblock' {
+    {Get-PSCMFunctionMetrics -ScriptBlock {} -ErrorAction Stop} |
+      Should -Not -Throw
   }
 }
 
