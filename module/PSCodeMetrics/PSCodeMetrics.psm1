@@ -187,7 +187,7 @@ class LocMetrics
   
   [string] ToString()
   {
-    return "{Sloc: $($this.Sloc)..}"
+    return "{Sloc: $($this.Sloc)...}"
   }
 }
 
@@ -293,7 +293,7 @@ class CyclomaticComplexityMetrics
 
   [string] ToString()
   {
-    return "{IfElse: $($this.IfElse.Cc)..}"
+    return "{IfElse: $($this.IfElse.Cc)...}"
   }
 }
 
@@ -890,7 +890,7 @@ class TotalCommandMetrics
 
   [string] ToString()
   {
-    return "{CommandCount = $($this.CommandCount)...}"
+    return "{CommandCount: $($this.CommandCount)...}"
   }
 }
 
@@ -902,7 +902,7 @@ class TotalClauseMetrics
 
   [string] ToString()
   {
-    return "{Cc = $($this.Cc)...}"
+    return "{Cc: $($this.Cc)...}"
   }
 }
 

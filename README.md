@@ -18,8 +18,7 @@ Get-PSCMFunctionMetrics -FunctionName Get-PSCSFunctionMetrics
 ```
 Name                    Cc MaxNestedDepth Lloc CommandCount CcMetrics
 ----                    -- -------------- ---- ------------ ---------
-Get-PSCMFunctionMetrics  3              2   59            6 {IfElse: 1..}
-
+Get-PSCMFunctionMetrics  3              2   59            6 {IfElse: 1...}
 ```
 
 ### For script files

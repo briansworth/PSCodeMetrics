@@ -16,6 +16,8 @@ BeforeAll {
     {
       trap {oh no!} # trap no type (+1)
       trap [Exception] {again?!} # trap (+1)
+      $varCmd = 'arbitrary_cmd'
+      & $varCmd
 
       try # Try
       {
