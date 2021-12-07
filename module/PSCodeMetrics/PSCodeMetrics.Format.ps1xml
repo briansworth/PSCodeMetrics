@@ -12,13 +12,8 @@
                         <Label>Name</Label>
                     </TableColumnHeader>
                     <TableColumnHeader>
-                        <Label>Cc</Label>
-                        <Width>13</Width>
-                        <Alignment>Right</Alignment>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Label>MaxNestedDepth</Label>
-                        <Width>14</Width>
+                        <Label>CcGrade</Label>
+                        <Width>10</Width>
                         <Alignment>Right</Alignment>
                     </TableColumnHeader>
                     <TableColumnHeader>
@@ -27,12 +22,17 @@
                         <Alignment>Right</Alignment>
                     </TableColumnHeader>
                     <TableColumnHeader>
-                        <Label>CommandCount</Label>
-                        <Width>12</Width>
+                        <Label>MaxNestedDepth</Label>
+                        <Width>14</Width>
                         <Alignment>Right</Alignment>
                     </TableColumnHeader>
                     <TableColumnHeader>
                         <Label>CcMetrics</Label>
+                        <Width>12</Width>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>LocMetrics</Label>
                         <Width>12</Width>
                         <Alignment>Left</Alignment>
                     </TableColumnHeader>
@@ -44,19 +44,21 @@
                                 <PropertyName>Name</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>Cc</PropertyName>
+                                <ScriptBlock>
+                                    "$($_.CcMetrics.Grade) `($($_.CcMetrics.Cc)`)"
+                                </ScriptBlock>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.LocMetrics.Lloc</ScriptBlock>
                             </TableColumnItem>
                             <TableColumnItem>
                                 <PropertyName>MaxNestedDepth</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>Lloc</PropertyName>
-                            </TableColumnItem>
-                            <TableColumnItem>
-                                <PropertyName>CommandCount</PropertyName>
-                            </TableColumnItem>
-                            <TableColumnItem>
                                 <PropertyName>CcMetrics</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>LocMetrics</PropertyName>
                             </TableColumnItem>
                         </TableColumnItems>
                     </TableRowEntry>

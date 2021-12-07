@@ -115,7 +115,8 @@ Describe Get-PSCMFunctionMetrics {
 
     $result = Get-PSCMFunctionMetrics -ScriptBlock $mockFunction
 
-    $result.Cc | Should -BeExactly $expectedCc
+    $result.CcMetrics.Cc | Should -BeExactly $expectedCc
+    $result.CcMetrics.Grade | Should -Be 'D'
   }
 
   It 'Correctly analyzes its own function code' {
@@ -126,6 +127,14 @@ Describe Get-PSCMFunctionMetrics {
   It 'Throws exception when function does not exist' {
     $funcName = 'NotExists'
     $expectedMsg = "Function: *$funcName* does not exist*"
+
+    {Get-PSCMFunctionMetrics -FunctionName $funcName -ErrorAction Stop} |
+      Should -Throw -ExceptionType ([ArgumentException]) -ExpectedMessage $expectedMsg
+  }
+
+  It 'Throws exception when function name is a cmdlet' {
+    $funcName = 'Get-ChildItem'
+    $expectedMsg = "$funcName is a *Cmdlet*"
 
     {Get-PSCMFunctionMetrics -FunctionName $funcName -ErrorAction Stop} |
       Should -Throw -ExceptionType ([ArgumentException]) -ExpectedMessage $expectedMsg

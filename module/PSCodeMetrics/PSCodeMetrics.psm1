@@ -54,11 +54,8 @@ function Get-FunctionMetrics
 
     $functionMetric = [FunctionMetrics]@{
       'Name' = $FunctionName;
-      'Cc' = $cCMetrics.Cc;
-      'Lloc' = $locMetrics.Lloc;
       'CcMetrics' = $cCMetrics;
       'LocMetrics' = $locMetrics;
-      'CommandCount' = $commandMetrics.CommandCount;
       'MaxNestedDepth' = $nestedDepth;
       'CommandMetrics' = $commandMetrics;
     }
@@ -83,7 +80,7 @@ function ConvertTo-ScriptBlock
     if ($command.CommandType -ne 'Function')
     {
       $emsg = [string]::Format(
-        'Function: [{0}] is a [{1}]. Only PowerShell functions are supported',
+        '{0} is a [{1}]. Only PowerShell functions are supported',
         $FunctionName,
         $command.CommandType
       )
@@ -94,7 +91,11 @@ function ConvertTo-ScriptBlock
     $scriptBlock = Get-Content -Path $functionPath -ErrorAction Stop
     return $scriptBlock
   }
-  catch [Management.Automation.RuntimeException]
+  catch [ArgumentException]
+  {
+    Write-Error -ErrorRecord $_
+  }
+  catch
   {
     $emsg = [string]::Format(
       'Function: [{0}] does not exist or is not imported into the session',
@@ -103,22 +104,15 @@ function ConvertTo-ScriptBlock
     $exception = [ArgumentException]::new($emsg, $_.Exception)
     Write-Error -Exception $exception -Category InvalidArgument
   }
-  catch
-  {
-    Write-Error -ErrorRecord $_
-  }
 }
 
 
 class FunctionMetrics
 {
   [string]$Name
-  [int]$Cc
-  [int]$Lloc
   [int]$MaxNestedDepth
   [CyclomaticComplexityMetrics]$CcMetrics
   [LocMetrics]$LocMetrics
-  [int]$CommandCount
   [TotalCommandMetrics]$CommandMetrics
 }
 
@@ -238,50 +232,90 @@ function Get-ScriptBlockCyclomaticComplexity
     [Parameter(Position=0, Mandatory=$true)]
     [scriptblock]$ScriptBlock
   )
-    $ifMetric = Get-ScriptBlockIfMetrics -ScriptBlock $ScriptBlock `
-      -ErrorAction Stop
-    $foreachMetric = Get-ScriptBlockForeachMetrics -ScriptBlock $ScriptBlock `
-      -ErrorAction Stop
-    $forMetric = Get-ScriptBlockForMetrics -ScriptBlock $ScriptBlock `
-      -ErrorAction Stop
-    $tryMetric = Get-ScriptBlockTryCatchMetrics -ScriptBlock $ScriptBlock `
-      -ErrorAction Stop
-    $switchMetric = Get-ScriptBlockSwitchMetrics -ScriptBlock $ScriptBlock `
-      -ErrorAction Stop
-    $whileMetric = Get-ScriptBlockWhileMetrics -ScriptBlock $ScriptBlock `
-      -ErrorAction Stop
-    $trapMetric = Get-ScriptBlockTrapMetrics -ScriptBlock $ScriptBlock `
-      -ErrorAction Stop
-    $operatorMetric = Get-BoolOperatorMetrics -ScriptBlock $ScriptBlock `
-      -ErrorAction Stop
+  $ifMetric = Get-ScriptBlockIfMetrics -ScriptBlock $ScriptBlock
+  $foreachMetric = Get-ScriptBlockForeachMetrics -ScriptBlock $ScriptBlock
+  $forMetric = Get-ScriptBlockForMetrics -ScriptBlock $ScriptBlock
+  $tryMetric = Get-ScriptBlockTryCatchMetrics -ScriptBlock $ScriptBlock
+  $switchMetric = Get-ScriptBlockSwitchMetrics -ScriptBlock $ScriptBlock
+  $whileMetric = Get-ScriptBlockWhileMetrics -ScriptBlock $ScriptBlock
+  $trapMetric = Get-ScriptBlockTrapMetrics -ScriptBlock $ScriptBlock
+  $operatorMetric = Get-BoolOperatorMetrics -ScriptBlock $ScriptBlock
 
-    $totalCc = $ifMetric.Cc + `
-      $foreachMetric.Cc + `
-      $forMetric.Cc + `
-      $tryMetric.Cc + `
-      $switchMetric.Cc + `
-      $whileMetric.Cc + `
-      $trapMetric.Cc + `
-      $operatorMetric.Cc + 1 # Always at least 1 code path
+  $totalCc = $ifMetric.Cc + `
+    $foreachMetric.Cc + `
+    $forMetric.Cc + `
+    $tryMetric.Cc + `
+    $switchMetric.Cc + `
+    $whileMetric.Cc + `
+    $trapMetric.Cc + `
+    $operatorMetric.Cc + 1 # Always at least 1 code path
+  $grade = Get-CyclomaticComplexityGrade -Cc $totalCc
 
-    $cCMetrics = [CyclomaticComplexityMetrics]@{
-      'Cc' = $totalCc;
-      'IfElse' = $ifMetric;
-      'Foreach' = $foreachMetric;
-      'For' = $forMetric;
-      'TryCatch' = $tryMetric;
-      'Switch' = $switchMetric;
-      'While' = $whileMetric;
-      'Trap' = $trapMetric;
-      'BoolOperator' = $operatorMetric;
-    }
-    return $cCMetrics
+  $cCMetrics = [CyclomaticComplexityMetrics]@{
+    'Grade' = $grade;
+    'Cc' = $totalCc
+    'IfElse' = $ifMetric;
+    'Foreach' = $foreachMetric;
+    'For' = $forMetric;
+    'TryCatch' = $tryMetric;
+    'Switch' = $switchMetric;
+    'While' = $whileMetric;
+    'Trap' = $trapMetric;
+    'BoolOperator' = $operatorMetric;
+  }
+  return $cCMetrics
+}
+
+function Get-CyclomaticComplexityGrade
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [int]$Cc
+  )
+  if ($Cc -le 5)
+  {
+    $grade = [CcGrade]::A
+  }
+  elseif ($Cc -le 10)
+  {
+    $grade = [CcGrade]::B
+  }
+  elseif ($Cc -le 20)
+  {
+    $grade = [CcGrade]::C
+  }
+  elseif ($Cc -le 30)
+  {
+    $grade = [CcGrade]::D
+  }
+  elseif ($Cc -le 40)
+  {
+    $grade = [CcGrade]::E
+  }
+  else
+  {
+    $grade = [CcGrade]::F
+  }
+  return $grade
+}
+
+
+enum CcGrade
+{
+  A
+  B
+  C
+  D
+  E
+  F
 }
 
 
 class CyclomaticComplexityMetrics
 {
   [int]$Cc
+  [CcGrade]$Grade
   [TotalIfClauseMetrics]$IfElse
   [TotalForeachClauseMetrics]$Foreach
   [TotalForClauseMetrics]$For
@@ -293,7 +327,7 @@ class CyclomaticComplexityMetrics
 
   [string] ToString()
   {
-    return "{IfElse: $($this.IfElse.Cc)...}"
+    return "{Cc: $($this.Rating.Cc)...}"
   }
 }
 
@@ -576,7 +610,7 @@ class BoolOperatorMetrics
 
   [string] ToString()
   {
-    return "{Cc = $($this.Cc)...}"
+    return "{Cc: $($this.Cc)...}"
   }
 }
 
@@ -1317,12 +1351,12 @@ function Get-CommentDetails
     [Parameter(Position=1, Mandatory=$true)]
     [Management.Automation.Language.Token]$CommentToken
   )
-  $startIndex = $CommentToken.Extent.StartLineNumber - 1
-  $endIndex = $CommentToken.Extent.EndLineNumber - 2
-  $range = [Range]::new($startIndex, $endIndex)
+  $startLine = $CommentToken.Extent.StartLineNumber
+  $endLine = $CommentToken.Extent.EndLineNumber
+  $range = [Range]::new($startLine, $endLine)
 
   $context = Get-ScriptBlockContext -ScriptBlock $ScriptBlock -LineRange $range
-  $commentType = Resolve-CommentType -Context $context
+  $commentType = Resolve-CommentType -Context $context.Context
   $details = [CommentDetails]@{
     'Type' = $commentType;
     'Token' = $CommentToken;
@@ -1341,7 +1375,7 @@ function Get-ScriptBlockContext
     [Parameter(Position=1, Mandatory=$true)]
     [range]$LineRange
   )
-  $offset = $LineRange.Start.Value
+  $offset = $ScriptBlock.Ast.Extent.StartLineNumber
   $start = $LineRange.Start.Value - $offset
   $end = $LineRange.End.Value - $offset
 
