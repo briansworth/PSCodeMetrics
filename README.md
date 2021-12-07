@@ -19,7 +19,7 @@ Get-PSCMFunctionMetrics -FunctionName Get-PSCSFunctionMetrics
 Name                    CcGrade Lloc MaxNestedDepth CcMetrics  LocMetrics
 ----                    ------- ---- -------------- ---------  ----------
 Get-PSCMFunctionMetrics   A (3)   31              2 {Cc: 3...} {Sloc: 66...}
-``
+```
 
 ### For script files
 
