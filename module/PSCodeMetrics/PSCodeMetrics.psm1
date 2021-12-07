@@ -327,7 +327,7 @@ class CyclomaticComplexityMetrics
 
   [string] ToString()
   {
-    return "{Cc: $($this.Rating.Cc)...}"
+    return "{Cc: $($this.Cc)...}"
   }
 }
 
