@@ -10,7 +10,9 @@ BeforeAll {
       [bool]$Test = $true
     )
     <#
+
     Comment block
+
     #>
     Process
     {

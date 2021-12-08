@@ -155,12 +155,13 @@ function Get-ScriptBlockLocMetrics
     [scriptblock]$ScriptBlock
   )
 
-  $sloc = $ScriptBlock.Ast.Extent.EndLineNumber -`
+  $sloc = $ScriptBlock.Ast.Extent.EndLineNumber - `
     $ScriptBlock.Ast.Extent.StartLineNumber + 1
   $comments = Get-ScriptBlockCommentMetrics -ScriptBlock $ScriptBlock
   $emptyLines = Get-ScriptBlockEmptyLineMetrics -ScriptBlock $ScriptBlock
+  $overlap = Measure-CommentEmptyLines -Comments $comments
 
-  $lloc = $sloc - $comments.CommentLineCount - $emptyLines.TotalEmptyLines
+  $lloc = $sloc - $comments.CommentLineCount - $emptyLines.TotalEmptyLines + $overlap.Count
 
   $metrics = [LocMetrics]@{
     'Lloc' = $lloc;
@@ -558,6 +559,28 @@ function Get-ScriptBlockEmptyLineMetrics
   return $totalMetrics
 }
 
+function Measure-CommentEmptyLines
+{
+  [CmdletBinding()]
+  param(
+    [Parameter(Position=0, Mandatory=$true)]
+    [TotalCommentMetrics]$Comments
+  )
+  $overlapCounter = 0
+  $overlapLines = New-Object -TypeName Collections.Generic.List[string]
+  $blockComments = $Comments.Details | Where-Object {$_.Type -eq 'Block'}
+  foreach ($comment in $blockComments)
+  {
+    $commentSb = [scriptblock]::Create($comment.Token.Extent.Text)
+    $emptyLines = Get-ScriptBlockEmptyLineMetrics -ScriptBlock $commentSb
+    $overlapCounter += $emptyLines.TotalEmptyLines
+  }
+  $output = [PSObject]@{
+    'Count' = $overlapCounter;
+  }
+  return $output
+}
+
 function Get-BoolOperatorMetrics
 {
   [CmdletBinding()]
@@ -905,6 +928,11 @@ class TotalEmptyLineMetrics
 {
   [int]$TotalEmptyLines
   [EmptyLineMetrics[]]$EmptyLines
+
+  [string] ToString()
+  {
+    return "{EmptyLines: $($this.TotalEmptyLines)...}"
+  }
 }
 
 
@@ -913,6 +941,11 @@ class TotalCommentMetrics
   [int]$TotalComments
   [int]$CommentLineCount
   [CommentDetails[]]$Details
+
+  [string] ToString()
+  {
+    return "{Comments: $($this.TotalComments)...}"
+  }
 }
 
 
@@ -1194,8 +1227,8 @@ function Get-EmptyLineMetric
     [Parameter(Position=0, Mandatory=$true)]
     [scriptblock]$ScriptBlock
   )
-  $endLine = $ScriptBlock.Ast.Extent.EndLineNumber - 1
-  $startLine = $ScriptBlock.Ast.Extent.StartLineNumber - 1
+  $endLine = $ScriptBlock.Ast.Extent.EndLineNumber
+  $startLine = $ScriptBlock.Ast.Extent.StartLineNumber
   $range = [Range]::new($startLine, $endLine)
 
   $context = Get-ScriptBlockContext -ScriptBlock $ScriptBlock -LineRange $range
@@ -1207,7 +1240,7 @@ function Get-EmptyLineMetric
     if ($isEmpty.Result)
     {
       $metric = [EmptyLineMetrics]@{
-        'LineNumber' = $i + 1 + $context.Offset;
+        'LineNumber' = $i + $context.Offset;
         'HasWhitespace' = $isEmpty.HasWhitespace;
       }
       $metrics.Add($metric)
@@ -1375,12 +1408,12 @@ function Get-ScriptBlockContext
     [Parameter(Position=1, Mandatory=$true)]
     [range]$LineRange
   )
-  $offset = $ScriptBlock.Ast.Extent.StartLineNumber
-  $start = $LineRange.Start.Value - $offset
-  $end = $LineRange.End.Value - $offset
+  $offset = $ScriptBlock.Ast.Extent.StartScriptPosition.LineNumber
+  $startIndex = $LineRange.Start.Value - $offset
+  $endIndex = $LineRange.End.Value - $offset
 
   $scriptLines = $ScriptBlock.Ast.Extent.Text.Split("`n")
-  $context = $scriptLines["$start".."$end"]
+  $context = $scriptLines["$startIndex".."$endIndex"]
   $output = New-Object -TypeName PSObject -Property @{
     'Context' = $context;
     'Offset' = $offset;
