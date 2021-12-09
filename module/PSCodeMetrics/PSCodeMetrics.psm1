@@ -1231,6 +1231,7 @@ function Get-EmptyLineMetric
   $startLine = $ScriptBlock.Ast.Extent.StartLineNumber
   $range = [Range]::new($startLine, $endLine)
 
+  Write-Debug -Message "Get EmptyLine context. Range: [$range]"
   $context = Get-ScriptBlockContext -ScriptBlock $ScriptBlock -LineRange $range
   $metrics = New-Object -TypeName Collections.Generic.List[EmptyLineMetrics]
   for ($i = 0; $i -lt $context.Context.Length; $i++)
@@ -1384,10 +1385,13 @@ function Get-CommentDetails
     [Parameter(Position=1, Mandatory=$true)]
     [Management.Automation.Language.Token]$CommentToken
   )
-  $startLine = $CommentToken.Extent.StartLineNumber
-  $endLine = $CommentToken.Extent.EndLineNumber
-  $range = [Range]::new($startLine, $endLine)
+  $sbStartLine = $ScriptBlock.Ast.Extent.StartLineNumber
 
+  $startLine = $CommentToken.Extent.StartLineNumber + $sbStartLine
+  $endLine = $CommentToken.Extent.EndLineNumber + $sbStartLine
+  $range = [Range]::new($startLine, $endLine)
+  
+  Write-Debug -Message "Get comment context. Range: [$range]"
   $context = Get-ScriptBlockContext -ScriptBlock $ScriptBlock -LineRange $range
   $commentType = Resolve-CommentType -Context $context.Context
   $details = [CommentDetails]@{
@@ -1409,10 +1413,14 @@ function Get-ScriptBlockContext
     [range]$LineRange
   )
   $offset = $ScriptBlock.Ast.Extent.StartScriptPosition.LineNumber
+  Write-Debug -Message "ScriptBlock Offset: [$offset]"
+  Write-Debug -Message "Target LineRange: [$LineRange]"
   $startIndex = $LineRange.Start.Value - $offset
   $endIndex = $LineRange.End.Value - $offset
 
   $scriptLines = $ScriptBlock.Ast.Extent.Text.Split("`n")
+  Write-Debug -Message "Index range: [$startIndex..$endIndex]"
+  Write-Debug -Message "ScriptBlock length: [$($scriptLines.Length)]"
   $context = $scriptLines["$startIndex".."$endIndex"]
   $output = New-Object -TypeName PSObject -Property @{
     'Context' = $context;
